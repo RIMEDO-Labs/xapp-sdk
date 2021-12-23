@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/manager"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
@@ -26,6 +27,8 @@ const (
 )
 
 func main() {
+
+	manager.NewManager()
 
 	// Select Log Level
 	log.SetLevel(logging.DebugLevel)
