@@ -1,0 +1,11 @@
+apiVersion: v2
+name: xapp-sdk
+description: RIMEDO-Labs xApp SDK
+kubeVersion: ">=1.17.0"
+type: application
+version: 0.0.1
+appVersion: v0.0.1
+home: https://rimedolabs.com
+maintainers:
+  - name: Lukasz Kulacz
+    email: lukasz.kulacz@rimedolabs.com

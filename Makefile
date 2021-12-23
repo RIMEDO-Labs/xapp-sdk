@@ -1,4 +1,5 @@
 .PHONY: build
+#GO111MODULE=on 
 
 build:
 	GOPRIVATE="github.com/onosproject/*" go build -o build/_output/xapp-sdk ./cmd
@@ -6,16 +7,13 @@ build:
 build-tools:=$(shell if [ ! -d "./build/build-tools" ]; then cd build && git clone https://github.com/onosproject/build-tools.git; fi)
 include ./build/build-tools/make/onf-common.mk
 
-
 docker:
 	@go mod vendor
-	sudo docker build -f build/Dockerfile -t xapp-sdk:latest .
+	sudo docker build -f build/Dockerfile -t rimedo-labs/xapp-sdk:v0.0.1 . 
 	@rm -rf vendor
 
 install-xapp:
-	kubectl -n riab apply -f deployment/deployment.yaml
-	kubectl -n riab apply -f deployment/service.yaml
+	helm install -n riab xapp-sdk ./helm-chart/xapp-sdk --values ./helm-chart/xapp-sdk/values.yaml
 
 delete-xapp:
-	kubectl -n riab delete -f deployment/deployment.yaml
-	kubectl -n riab delete -f deployment/service.yaml
+	helm uninstall -n riab xapp-sdk

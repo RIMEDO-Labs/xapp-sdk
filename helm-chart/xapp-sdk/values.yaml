@@ -1,0 +1,14 @@
+image:
+  repository: rimedo-labs/xapp-sdk
+  pullPolicy: IfNotPresent
+  tag: v0.0.1
+
+service:
+  grpc:
+    port: 5150
+
+config:
+  e2tAddress: "onos-e2t"
+  e2tPort: 5150
+  topoAddress: "onos-topo"
+  topoPort: 5150

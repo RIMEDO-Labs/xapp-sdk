@@ -8,4 +8,5 @@ require (
 	github.com/onosproject/onos-lib-go v0.7.22
 	github.com/onosproject/onos-ric-sdk-go v0.7.34
 	google.golang.org/protobuf v1.27.1
+	google.golang.org/grpc v1.39.0
 )

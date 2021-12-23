@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/manager"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
@@ -12,6 +15,7 @@ import (
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 	toposdk "github.com/onosproject/onos-ric-sdk-go/pkg/topo"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,7 +30,34 @@ const (
 	sm_ver       = "v1"
 )
 
+func server() {
+	lis, err := net.Listen("tcp", ":5150")
+	if err != nil {
+		log.Fatal("Failed to listen: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatal("Failed to serve: %s", err)
+	}
+}
+
 func main() {
+	e2tAddress := flag.String("e2tAddress", "", "address of onos-e2t")
+	e2tPort := flag.Int("e2tPort", 0, "port of onos-e2t")
+	topoAddress := flag.String("topoAddress", "", "address of onos-topo")
+	topoPort := flag.Int("topoPort", 0, "port of onos-topo")
+	flag.Parse()
+
+	go server()
+
+	log.Info("Read from parameters:")
+	log.Info("E2T address: " + *e2tAddress)
+	log.Info("E2T port: " + strconv.Itoa(*e2tPort))
+	log.Info("TOPO address: " + *topoAddress)
+	log.Info("TOPO port: " + strconv.Itoa(*topoPort))
+
+	// https://tutorialedge.net/golang/go-grpc-beginners-tutorial/
 
 	manager.NewManager()
 
@@ -117,6 +148,9 @@ func main() {
 			}
 			log.Info("Sent subscription")
 			log.Debug("Channel ID: " + channelID)
+			for ind := range ch_ind {
+				log.Info(ind)
+			}
 
 		case topoapi.EventType_ADDED:
 			log.Debug("topoEvent.Type=ADDED")

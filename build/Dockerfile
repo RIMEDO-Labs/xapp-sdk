@@ -5,6 +5,7 @@ ENV GO111MODULE=on
 COPY Makefile go.mod go.sum /go/src/github.com/rimedo-labs/xapp-sdk/
 COPY cmd/ /go/src/github.com/rimedo-labs/xapp-sdk/cmd/
 COPY vendor/ /go/src/github.com/rimedo-labs/xapp-sdk/vendor/
+COPY pkg/ /go/src/github.com/rimedo-labs/xapp-sdk/pkg/
 COPY build/build-tools /go/src/github.com/rimedo-labs/xapp-sdk/build/build-tools/
 
 RUN cd /go/src/github.com/rimedo-labs/xapp-sdk && GOFLAGS=-mod=vendor make build

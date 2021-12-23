@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "xapp-sdk.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: {{ template "xapp-sdk.fullname" . }}
+      app: rimedo
+      type: xapp-sdk
+      resource: {{ template "xapp-sdk.fullname" . }}
+  template:
+    metadata:
+      annotations:
+        proxy.onosproject.org/inject: "true"
+      labels:
+        name: {{ template "xapp-sdk.fullname" . }}
+        app: rimedo
+        type: xapp-sdk
+        resource: {{ template "xapp-sdk.fullname" . }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "-e2tAddress={{ .Values.config.e2tAddress }}"
+            - "-e2tPort={{ .Values.config.e2tPort }}"
+            - "-topoAddress={{ .Values.config.topoAddress }}"
+            - "-topoPort={{ .Values.config.topoPort }}"
+          ports:
+            - name: grpc
+              containerPort: {{ .Values.service.grpc.port }}
+          startupProbe:
+            tcpSocket:
+              port: {{ .Values.service.grpc.port }}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.service.grpc.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.service.grpc.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
