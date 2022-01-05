@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/broker"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/manager"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
+	e2ind "github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 	toposdk "github.com/onosproject/onos-ric-sdk-go/pkg/topo"
 	"google.golang.org/grpc"
@@ -30,6 +33,12 @@ const (
 	sm_ver       = "v1"
 )
 
+type E2NodeIndication struct {
+	NodeID      string
+	TriggerType e2sm_mho.MhoTriggerType
+	IndMsg      e2ind.Indication
+}
+
 func server() {
 	lis, err := net.Listen("tcp", ":5150")
 	if err != nil {
@@ -42,7 +51,13 @@ func server() {
 	}
 }
 
+var subscriptionBroker broker.Broker = broker.NewBroker()
+var indCh chan *E2NodeIndication = make(chan *E2NodeIndication)
+var mu sync.RWMutex
+
 func main() {
+	go listenIndChan(context.Background(), indCh)
+
 	e2tAddress := flag.String("e2tAddress", "", "address of onos-e2t")
 	e2tPort := flag.Int("e2tPort", 0, "port of onos-e2t")
 	topoAddress := flag.String("topoAddress", "", "address of onos-topo")
@@ -143,13 +158,51 @@ func main() {
 			log.Info("Creating subscription for E2 node with ID:", e2NodeID)
 			subName := fmt.Sprintf("rimedo-mho-subscription-%s", e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC)
 			channelID, err := node.Subscribe(ctx, subName, subSpec, ch_ind)
+			_ = channelID
 			if err != nil {
 				log.Warn(err)
 			}
+
+			// streamReader, err := subscriptionBroker.OpenReader(ctx, node, subName, channelID, subSpec)
+			//if err != nil {
+			//	log.Warn(err)
+			//}
+			//ch := make(chan e2api.Indication)
+			//go sendIndicationOnStream(streamReader.StreamID(), ch)
+
+			//go startMonitoring(ctx, streamReader, e2NodeID, indCh, e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC)
+
+			triggerType := e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC
+
 			log.Info("Sent subscription")
-			log.Debug("Channel ID: " + channelID)
+			//log.Debug("Channel ID: " + channelID)
 			for ind := range ch_ind {
-				log.Info(ind)
+				indHeaderByte := ind.Header
+				indMessageByte := ind.Payload
+
+				indHeader := e2sm_mho.E2SmMhoIndicationHeader{}
+				if err = proto.Unmarshal(indHeaderByte, &indHeader); err == nil {
+					indMessage := e2sm_mho.E2SmMhoIndicationMessage{}
+					if err = proto.Unmarshal(indMessageByte, &indMessage); err == nil {
+						switch x := indMessage.E2SmMhoIndicationMessage.(type) {
+						case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
+							if triggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
+								log.Info("Handle meansurement report")
+								//go handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+							} else if triggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
+								log.Info("Handle periodic report")
+								go handlePeriodicReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1())
+
+							}
+						case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
+							//go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2())
+							log.Info("Handle rrc state")
+						default:
+							log.Warnf("Unknown MHO indication message format, indication message: %v", x)
+						}
+
+					}
+				}
 			}
 
 		case topoapi.EventType_ADDED:
@@ -162,53 +215,182 @@ func main() {
 			log.Warn("unknown topoEvent.Type")
 		}
 	}
+}
 
-	/*
-		client := e2client.NewClient(e2client.WithE2TAddress("localhost", 5150),
-			e2client.WithServiceModel(e2client.ServiceModelName("oran-e2sm-kpm"),
-				e2client.ServiceModelVersion("v2")),
-			e2client.WithEncoding(e2client.ProtoEncoding))
+func handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1) {
+	//mu.Lock()
+	//defer mu.Unlock()
+	ueID := message.GetUeId().GetValue()
+	cgi := getCGIFromIndicationHeader(header)
+	log.Infof("rx periodic ueID:%v cgi:%v", ueID, cgi)
 
-		e2node := client.Node(e2client.NodeID("e2:1/5153"))
+	// get ue from store (create if it does not exist)
+	// var ueData *UeData
+	// newUe := false
+	// ueData = c.getUe(ctx, ueID)
+	// if ueData == nil {
+	// 	ueData = c.createUe(ctx, ueID)
+	//	c.attachUe(ctx, ueData, cgi)
+	//		newUe = true
+	//} else if ueData.CGIString != cgi {
+	//	return
+	//}
 
-		subName := "onos-kpimon-subscriptionxd"
-		var eventTriggerData []byte
+	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+	log.Infof("rsrp_serving:%v rsrp_neighbors:%v", rsrpServing, rsrpNeighbors)
 
-		actions := make([]e2api.Action, 0)
+	//if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
+	//	return
+	//}
 
-		action := &e2api.Action{
-			ID:   0,
-			Type: e2api.ActionType_ACTION_TYPE_REPORT,
-			SubsequentAction: &e2api.SubsequentAction{
-				Type:       e2api.SubsequentActionType_SUBSEQUENT_ACTION_TYPE_CONTINUE,
-				TimeToWait: e2api.TimeToWait_TIME_TO_WAIT_ZERO,
-			},
+	// update store
+	//ueData.RsrpServing, ueData.RsrpNeighbors = rsrpServing, rsrpNeighbors
+	//c.setUe(ctx, ueData)
+
+}
+
+func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
+	var rsrpServing int32
+	rsrpNeighbors := make(map[string]int32)
+
+	for _, measReportItem := range measReport {
+		if getNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
+			rsrpServing = measReportItem.GetRsrp().GetValue()
+		} else {
+			CGIString := getCGIFromMeasReportItem(measReportItem)
+			rsrpNeighbors[CGIString] = measReportItem.GetRsrp().GetValue()
 		}
+	}
 
-		actions = append(actions, *action)
+	return rsrpServing, rsrpNeighbors
+}
 
-		subSpec := e2api.SubscriptionSpec{
-			Actions: actions,
-			EventTrigger: e2api.EventTrigger{
-				Payload: eventTriggerData,
-			}}
+func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem) string {
+	nci := getNciFromCellGlobalID(measReport.GetCgi())
+	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(measReport.GetCgi())
+	plmnID := plmnIDBytesToInt(plmnIDBytes)
+	return plmnIDNciToCGI(plmnID, nci)
+}
 
-		// ch := make(chan e2api.Indication)
+func getCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {
+	nci := getNciFromCellGlobalID(header.GetCgi())
+	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(header.GetCgi())
+	plmnID := plmnIDBytesToInt(plmnIDBytes)
+	return plmnIDNciToCGI(plmnID, nci)
+}
 
-		// ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		// defer cancel()
-		log.Info("Trying to subscribe")
-		// channelID, err := e2node.Subscribe(ctx, subName, subSpec, ch)
+func getNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
+	return cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+}
 
+func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
+	return cellGlobalID.GetNrCgi().GetPLmnIdentity().GetValue()
+}
+
+func plmnIDBytesToInt(b []byte) uint64 {
+	return uint64(b[2])<<16 | uint64(b[1])<<8 | uint64(b[0])
+}
+
+func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
+	return strconv.FormatInt(int64(plmnID<<36|(nci&0xfffffffff)), 16)
+}
+
+func sendIndicationOnStream(streamID broker.StreamID, ch chan e2api.Indication) {
+	log.Info("In sendIndicationOnStream")
+	streamWriter, err := subscriptionBroker.GetWriter(streamID)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	for msg := range ch {
+		log.Info("In sendIndicationOnStream loop")
+		err := streamWriter.Send(msg)
+		if err != nil {
+			log.Warn(err)
+			return
+		}
+	}
+}
+
+func startMonitoring(ctx context.Context, streamReader broker.StreamReader, nodeID topoapi.ID, indChan chan *E2NodeIndication, triggerType e2sm_mho.MhoTriggerType) error {
+	log.Info("In startMonitoring")
+	errCh := make(chan error)
+	go func() {
+		for {
+			indMsg, err := streamReader.Recv(ctx)
+			if err != nil {
+				log.Errorf("Error reading indication stream, chanID:%v, streamID:%v, err:%v", streamReader.ChannelID(), streamReader.StreamID(), err)
+				errCh <- err
+			}
+			err = processIndication(ctx, indMsg, nodeID, triggerType)
+			if err != nil {
+				log.Errorf("Error processing indication, err:%v", err)
+				errCh <- err
+			}
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func processIndication(ctx context.Context, indication e2api.Indication, nodeID topoapi.ID, triggerType e2sm_mho.MhoTriggerType) error {
+	log.Infof("processIndication, nodeID: %v, indication: %v ", nodeID, indication)
+	// Debugf
+	indCh <- &E2NodeIndication{
+		NodeID:      string(nodeID),
+		TriggerType: triggerType,
+		IndMsg: e2ind.Indication{
+			Payload: e2ind.Payload{
+				Header:  indication.Header,
+				Message: indication.Payload,
+			},
+		},
+	}
+
+	return nil
+}
+
+func listenIndChan(ctx context.Context, indChan chan *E2NodeIndication) {
+	var err error
+	log.Info("Before listenIndChan loop")
+	for indMsg := range indChan {
+		log.Info("In listenIndChan loop")
+
+		indHeaderByte := indMsg.IndMsg.Payload.Header
+		indMessageByte := indMsg.IndMsg.Payload.Message
+		e2NodeID := indMsg.NodeID
+		_ = e2NodeID
+
+		indHeader := e2sm_mho.E2SmMhoIndicationHeader{}
+		if err = proto.Unmarshal(indHeaderByte, &indHeader); err == nil {
+			indMessage := e2sm_mho.E2SmMhoIndicationMessage{}
+			if err = proto.Unmarshal(indMessageByte, &indMessage); err == nil {
+				switch x := indMessage.E2SmMhoIndicationMessage.(type) {
+				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
+					if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
+						log.Info("Handle meansurement report")
+						//go c.handleMeasReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+					} else if indMsg.TriggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC {
+						//go c.handlePeriodicReport(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat1(), e2NodeID)
+						log.Info("Handle periodic report")
+					}
+				case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
+					//go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2())
+					log.Info("Handle rrc state")
+				default:
+					log.Warnf("Unknown MHO indication message format, indication message: %v", x)
+				}
+			}
+		}
 		if err != nil {
 			log.Error(err)
 		}
-
-		for ind := range ch {
-			_ = ind
-			log.Info("we are here")
-		}
-
-		_ = channelID
-	*/
+	}
+	log.Info("After listenIndChan loop")
 }
