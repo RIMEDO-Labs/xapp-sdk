@@ -4,6 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/broker"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/monitoring"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
+
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
@@ -31,6 +36,14 @@ func main() {
 	log.SetLevel(logging.DebugLevel)
 
 	log.Info("Starting")
+
+	streams := broker.NewBroker()
+	//appConfig := config.NewConfig()
+	indChan := make(chan *mho.E2NodeIndication)
+	rnibClient, err := rnib.NewClient()
+	if err != nil {
+		log.Error("Some problem with rnib.Client!")
+	}
 
 	topoClient, err := toposdk.NewClient(toposdk.WithTopoHost(topo_address), toposdk.WithTopoPort(topo_port))
 	if err != nil {
@@ -115,6 +128,24 @@ func main() {
 			log.Info("Sent subscription")
 			log.Debug("Channel ID: " + channelID)
 
+			log.Info("Broker start")
+			streamReader, err := streams.OpenReader(ctx, node, subName, channelID, subSpec)
+			if err != nil {
+				return
+			}
+			_ = streamReader
+			log.Info("Monitoring start")
+			monitor := monitoring.NewMonitor(
+				//monitoring.WithAppConfig(appConfig),
+				monitoring.WithNode(node),
+				monitoring.WithStreamReader(streamReader),
+				monitoring.WithNodeID(e2NodeID),
+				monitoring.WithRNIBClient(rnibClient),
+				monitoring.WithIndChan(indChan),
+				//monitoring.WithTriggerType(triggerType))
+			)
+			_ = monitor
+
 		case topoapi.EventType_ADDED:
 			log.Debug("topoEvent.Type=ADDED")
 		case topoapi.EventType_REMOVED:
@@ -174,4 +205,5 @@ func main() {
 
 		_ = channelID
 	*/
+
 }

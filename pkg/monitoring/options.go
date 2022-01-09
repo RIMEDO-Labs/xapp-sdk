@@ -1,0 +1,95 @@
+// SPDX-FileCopyrightText: 2020-present Open Networking Foundation <info@opennetworking.org>
+//
+// SPDX-License-Identifier: LicenseRef-ONF-Member-Only-1.0
+
+package monitoring
+
+import (
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/broker"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
+	topoapi "github.com/onosproject/onos-api/go/onos/topo"
+
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
+)
+
+// Options monitor options
+type Options struct {
+	App AppOptions
+
+	Monitor MonitorOptions
+}
+
+// AppOptions application options
+type AppOptions struct {
+	RNIBClient  rnib.Client
+	TriggerType e2sm_mho.MhoTriggerType
+	IndCh       chan *mho.E2NodeIndication
+}
+
+// MonitorOptions monitoring options
+type MonitorOptions struct {
+	Node         e2client.Node
+	NodeID       topoapi.ID
+	StreamReader broker.StreamReader
+}
+
+// Option option interface
+type Option interface {
+	apply(*Options)
+}
+
+type funcOption struct {
+	f func(*Options)
+}
+
+func (f funcOption) apply(options *Options) {
+	f.f(options)
+}
+
+func newOption(f func(*Options)) Option {
+	return funcOption{
+		f: f,
+	}
+}
+
+// WithNodeID sets node ID
+func WithNodeID(nodeID topoapi.ID) Option {
+	return newOption(func(options *Options) {
+		options.Monitor.NodeID = nodeID
+	})
+}
+
+// WithStreamReader sets stream reader
+func WithStreamReader(streamReader broker.StreamReader) Option {
+	return newOption(func(options *Options) {
+		options.Monitor.StreamReader = streamReader
+	})
+}
+
+// WithNode sets e2 node interface
+func WithNode(node e2client.Node) Option {
+	return newOption(func(options *Options) {
+		options.Monitor.Node = node
+	})
+}
+
+// WithRNIBClient sets RNIB client
+func WithRNIBClient(rnibClient rnib.Client) Option {
+	return newOption(func(options *Options) {
+		options.App.RNIBClient = rnibClient
+	})
+}
+
+func WithIndChan(indCh chan *mho.E2NodeIndication) Option {
+	return newOption(func(options *Options) {
+		options.App.IndCh = indCh
+	})
+}
+
+func WithTriggerType(triggerType e2sm_mho.MhoTriggerType) Option {
+	return newOption(func(options *Options) {
+		options.App.TriggerType = triggerType
+	})
+}
