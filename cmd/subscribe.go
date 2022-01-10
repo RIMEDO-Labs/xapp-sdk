@@ -11,6 +11,7 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/broker"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/manager"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
+	"github.com/onosproject/onos-api/go/onos/topo"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
@@ -105,6 +106,36 @@ func main() {
 		},
 	}
 
+	cellEntityFilter := &topoapi.Filters{
+		KindFilter: &topoapi.Filter{
+			Filter: &topoapi.Filter_In{
+				In: &topoapi.InFilter{
+					Values: []string{topo.E2CELL},
+				},
+			},
+		},
+	}
+	objs, err := topoClient.List(ctx, toposdk.WithListFilters(cellEntityFilter))
+	if err != nil {
+		log.Warn(err)
+	}
+	for _, i := range objs {
+		cellObject := &topoapi.E2Cell{}
+		err = i.GetAspect(cellObject)
+		if err != nil {
+			log.Warn(err)
+		}
+		log.Info(cellObject.CellType)
+		cellTypeAspect := &topoapi.E2Cell{
+			CellType: "Macro",
+		}
+		err = i.SetAspect(cellTypeAspect)
+		if err != nil {
+			log.Warn(err)
+		}
+		topoClient.Update(ctx, &i)
+	}
+
 	log.Info("Watching onos-topo events...")
 	err = topoClient.Watch(ctx, ch_topo, toposdk.WithWatchFilters(controlRelationFilter))
 	if err != nil {
@@ -119,6 +150,12 @@ func main() {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
 			log.Info("e2NodeID: " + e2NodeID)
+
+			obj, err := topoClient.Get(ctx, e2NodeID)
+			if err != nil {
+				log.Warn(err)
+			}
+			log.Info(obj)
 
 			ch_ind := make(chan e2api.Indication)
 			node := e2Client.Node(e2client.NodeID(e2NodeID))
