@@ -1,7 +1,7 @@
 image:
   repository: rimedo-labs/xapp-sdk
   pullPolicy: IfNotPresent
-  tag: v0.0.1
+  tag: v0.0.2
 
 service:
   grpc:
