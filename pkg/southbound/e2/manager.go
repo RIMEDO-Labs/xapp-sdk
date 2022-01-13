@@ -89,6 +89,19 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 		return err
 	}
 
+	err = m.rnibClient.SetCellType(ctx, "e2:1/5153/1454c002", "Macro")
+	if err != nil {
+		log.Warn(err)
+	}
+
+	cellTypes, err := m.rnibClient.GetCellTypes(ctx)
+	if err != nil {
+		log.Warn(err)
+	}
+	for key, value := range cellTypes {
+		log.Infof("topoID:%v, CGI:%v, CellType:%v", key, value.CGI, value.CellType)
+	}
+
 	for topoEvent := range ch {
 		if topoEvent.Type == topoapi.EventType_ADDED || topoEvent.Type == topoapi.EventType_NONE {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)

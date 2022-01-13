@@ -80,7 +80,7 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx periodic ueID:%v cgi:%v", ueID, cgi)
+	log.Debugf("rx periodic ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
@@ -111,7 +111,7 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx a3 ueID:%v cgi:%v", ueID, cgi)
+	log.Debugf("rx a3 ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
@@ -143,7 +143,7 @@ func (c *Controller) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMh
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
-	log.Infof("rx rrc ueID:%v cgi:%v", ueID, cgi)
+	log.Debugf("rx rrc ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData

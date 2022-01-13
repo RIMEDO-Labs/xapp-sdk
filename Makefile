@@ -16,4 +16,6 @@ install-xapp:
 	helm install -n riab xapp-sdk ./helm-chart/xapp-sdk --values ./helm-chart/xapp-sdk/values.yaml
 
 delete-xapp:
-	helm uninstall -n riab xapp-sdk
+	-helm uninstall -n riab xapp-sdk
+
+dev: delete-xapp docker install-xapp 
