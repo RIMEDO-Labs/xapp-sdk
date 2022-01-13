@@ -30,7 +30,7 @@ type Options struct {
 }
 
 func NewManager(options Options, indCh chan *mho.E2NodeIndication) (Manager, error) {
-	log.Info("Init E2Manager")
+	//log.Info("Init E2Manager")
 
 	smName := e2client.ServiceModelName(options.SMName)
 	smVer := e2client.ServiceModelVersion(options.SMVersion)
@@ -67,7 +67,7 @@ type Manager struct {
 }
 
 func (m *Manager) Start() error {
-	log.Info("Start E2Manager")
+	// log.Info("Start E2Manager")
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -81,7 +81,7 @@ func (m *Manager) Start() error {
 }
 
 func (m *Manager) watchE2Connections(ctx context.Context) error {
-	log.Info("Start monitoring E2 connections")
+	// log.Info("Start monitoring E2 connections")
 	ch := make(chan topoapi.Event)
 	err := m.rnibClient.WatchE2Connections(ctx, ch)
 	if err != nil {
@@ -89,18 +89,20 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 		return err
 	}
 
-	err = m.rnibClient.SetCellType(ctx, "e2:1/5153/1454c002", "Macro")
-	if err != nil {
-		log.Warn(err)
-	}
+	/*
+		err = m.rnibClient.SetCellType(ctx, "e2:1/5153/1454c002", "Macro")
+		if err != nil {
+			log.Warn(err)
+		}
 
-	cellTypes, err := m.rnibClient.GetCellTypes(ctx)
-	if err != nil {
-		log.Warn(err)
-	}
-	for key, value := range cellTypes {
-		log.Infof("topoID:%v, CGI:%v, CellType:%v", key, value.CGI, value.CellType)
-	}
+		cellTypes, err := m.rnibClient.GetCellTypes(ctx)
+		if err != nil {
+			log.Warn(err)
+		}
+		for key, value := range cellTypes {
+			log.Infof("topoID:%v, CGI:%v, CellType:%v", key, value.CGI, value.CellType)
+		}
+	*/
 
 	for topoEvent := range ch {
 		if topoEvent.Type == topoapi.EventType_ADDED || topoEvent.Type == topoapi.EventType_NONE {
@@ -116,7 +118,7 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 			for triggerType, enabled := range triggers {
 				if enabled {
 					go func(triggerType e2sm_mho.MhoTriggerType) {
-						log.Infof("tx subscription, e2NodeID:%v, triggerType:%v", e2NodeID, e2sm_mho.MhoTriggerType_name[int32(triggerType)])
+						//log.Infof("tx subscription, e2NodeID:%v, triggerType:%v", e2NodeID, e2sm_mho.MhoTriggerType_name[int32(triggerType)])
 						err := m.createSubscription(ctx, e2NodeID, triggerType)
 						if err != nil {
 							log.Warn(err)
@@ -225,4 +227,21 @@ func (m *Manager) sendIndicationOnStream(streamID broker.StreamID, ch chan e2api
 			return
 		}
 	}
+}
+
+func (m *Manager) GetCellTypes(ctx context.Context) map[string]rnib.Cell {
+	cellTypes, err := m.rnibClient.GetCellTypes(ctx)
+	if err != nil {
+		log.Warn(err)
+	}
+	return cellTypes
+}
+
+func (m *Manager) SetCellType(ctx context.Context, cellID string, cellType string) error {
+	err := m.rnibClient.SetCellType(ctx, cellID, cellType)
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
+	return nil
 }

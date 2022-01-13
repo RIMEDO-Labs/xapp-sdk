@@ -77,8 +77,8 @@ func (c *Client) GetE2CellFilter() *topoapi.Filters {
 	return cellEntityFilter
 }
 
-func (c *Client) GetCellTypes(ctx context.Context) (map[topoapi.ID]Cell, error) {
-	output := make(map[topoapi.ID]Cell)
+func (c *Client) GetCellTypes(ctx context.Context) (map[string]Cell, error) {
+	output := make(map[string]Cell)
 
 	cells, err := c.client.List(ctx, toposdk.WithListFilters(c.GetE2CellFilter()))
 	if err != nil {
@@ -93,7 +93,7 @@ func (c *Client) GetCellTypes(ctx context.Context) (map[topoapi.ID]Cell, error) 
 		if err != nil {
 			log.Warn(err)
 		}
-		output[cell.ID] = Cell{
+		output[string(cell.ID)] = Cell{
 			CGI:      cellObject.CellObjectID,
 			CellType: cellObject.CellType,
 		}
@@ -101,8 +101,8 @@ func (c *Client) GetCellTypes(ctx context.Context) (map[topoapi.ID]Cell, error) 
 	return output, nil
 }
 
-func (c *Client) SetCellType(ctx context.Context, id topoapi.ID, cellType string) error {
-	cell, err := c.client.Get(ctx, id)
+func (c *Client) SetCellType(ctx context.Context, id string, cellType string) error {
+	cell, err := c.client.Get(ctx, topoapi.ID(id))
 	if err != nil {
 		log.Warn(err)
 		return err

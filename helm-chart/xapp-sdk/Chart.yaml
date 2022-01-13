@@ -1,7 +1,7 @@
 apiVersion: v2
 name: xapp-sdk
 description: RIMEDO-Labs xApp SDK
-kubeVersion: ">=1.17.0"
+kubeVersion: ">=1.16.0"
 type: application
 version: 0.0.1
 appVersion: v0.0.2

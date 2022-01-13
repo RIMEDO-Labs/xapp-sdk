@@ -44,7 +44,7 @@ func (b *streamBroker) OpenReader(ctx context.Context, node e2client.Node, subNa
 	stream = newBufferedStream(node, subName, streamID, channelID, subSpec)
 	b.subs[channelID] = stream
 	b.streams[streamID] = stream
-	log.Infof("Opened new stream %d for subscription channel '%s'", streamID, channelID)
+	//log.Infof("Opened new stream %d for subscription channel '%s'", streamID, channelID)
 	return stream, nil
 }
 
@@ -77,7 +77,7 @@ func (b *streamBroker) CloseStream(ctx context.Context, id e2api.ChannelID) (Str
 	delete(b.subs, stream.ChannelID())
 	delete(b.streams, stream.StreamID())
 
-	log.Infof("Closed stream %d for subscription '%s'", stream.StreamID(), id)
+	//log.Infof("Closed stream %d for subscription '%s'", stream.StreamID(), id)
 	return stream, stream.Close()
 }
 

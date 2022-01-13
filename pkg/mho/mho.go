@@ -21,7 +21,7 @@ type E2NodeIndication struct {
 }
 
 func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStore store.Store) *Controller {
-	log.Info("Init MhoController")
+	// log.Info("Init MhoController")
 	return &Controller{
 		IndChan:   indChan,
 		ueStore:   ueStore,
@@ -39,7 +39,7 @@ type Controller struct {
 }
 
 func (c *Controller) Run(ctx context.Context) {
-	log.Info("Start MhoController")
+	// log.Info("Start MhoController")
 	go c.listenIndChan(ctx)
 }
 

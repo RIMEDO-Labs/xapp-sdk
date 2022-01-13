@@ -3,9 +3,9 @@ package manager
 import (
 	"context"
 	"net"
-	"time"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/southbound/e2"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
@@ -63,7 +63,7 @@ type Manager struct {
 }
 
 func (m *Manager) Run() {
-	log.Info("Running Manager")
+	//log.Info("Running Manager")
 	if err := m.start(); err != nil {
 		log.Fatal("Unable to run Manager", err)
 	}
@@ -79,28 +79,30 @@ func (m *Manager) start() error {
 
 	go m.mhoCtrl.Run(context.Background())
 
-	go func() {
-		ctx := context.Background()
-		for {
-			time.Sleep(2 * time.Second)
-			log.Info("trying to get something...")
-			chEntries := make(chan *store.Entry, 1024)
-			err = m.ueStore.Entries(ctx, chEntries)
-			if err != nil {
-				log.Warn(err)
-			}
-			for entry := range chEntries {
-				ueData := entry.Value.(mho.UeData)
-				log.Infof("UeID:%v, CGI: %v, RSRP: %v", ueData.UeID, ueData.CGIString, ueData.RsrpServing)
-				log.Info("Neighbours:")
-				for key, ele := range ueData.RsrpNeighbors {
-					log.Infof(" - CGI:%v, RSRP:%v", key, ele)
+	/*
+		go func() {
+			ctx := context.Background()
+			for {
+				time.Sleep(2 * time.Second)
+				log.Info("trying to get something...")
+				chEntries := make(chan *store.Entry, 1024)
+				err = m.ueStore.Entries(ctx, chEntries)
+				if err != nil {
+					log.Warn(err)
 				}
-				log.Info(" ")
-			}
+				for entry := range chEntries {
+					ueData := entry.Value.(mho.UeData)
+					log.Infof("UeID:%v, CGI: %v, RSRP: %v", ueData.UeID, ueData.CGIString, ueData.RsrpServing)
+					log.Info("Neighbours:")
+					for key, ele := range ueData.RsrpNeighbors {
+						log.Infof(" - CGI:%v, RSRP:%v", key, ele)
+					}
+					log.Info(" ")
+				}
 
-		}
-	}()
+			}
+		}()
+	*/
 
 	return nil
 }
@@ -117,4 +119,27 @@ func (m *Manager) startNorthboundServer() error {
 		log.Fatal("Failed to serve: %s", err)
 	}
 	return nil
+}
+
+func (m *Manager) GetUEs(ctx context.Context) map[string]mho.UeData {
+	output := make(map[string]mho.UeData)
+	chEntries := make(chan *store.Entry, 1024)
+	err := m.ueStore.Entries(ctx, chEntries)
+	if err != nil {
+		log.Warn(err)
+		return output
+	}
+	for entry := range chEntries {
+		ueData := entry.Value.(mho.UeData)
+		output[ueData.UeID] = ueData
+	}
+	return output
+}
+
+func (m *Manager) GetCellTypes(ctx context.Context) map[string]rnib.Cell {
+	return m.e2Manager.GetCellTypes(ctx)
+}
+
+func (m *Manager) SetCellType(ctx context.Context, cellID string, cellType string) error {
+	return m.e2Manager.SetCellType(ctx, cellID, cellType)
 }
