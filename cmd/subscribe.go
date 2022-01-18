@@ -11,6 +11,7 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/broker"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/manager"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
+	"github.com/onosproject/onos-api/go/onos/topo"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
@@ -22,8 +23,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Defining log context
 var log = logging.GetLogger("main")
 
+// Parameters - probably for e2t manager
 const (
 	e2t_address  = "onos-e2t"
 	e2t_port     = 5150
@@ -33,12 +36,14 @@ const (
 	sm_ver       = "v1"
 )
 
+// Defining structure which represents indication from e2 node (cgi, trigger type and the message)
 type E2NodeIndication struct {
 	NodeID      string
 	TriggerType e2sm_mho.MhoTriggerType
 	IndMsg      e2ind.Indication
 }
 
+// Server func - indication listening and serving ?
 func server() {
 	lis, err := net.Listen("tcp", ":5150")
 	if err != nil {
@@ -51,19 +56,27 @@ func server() {
 	}
 }
 
+// Broker (WGO?)
 var subscriptionBroker broker.Broker = broker.NewBroker()
+
+// Channel to recieve indications
 var indCh chan *E2NodeIndication = make(chan *E2NodeIndication)
 var mu sync.RWMutex
 
+// Main func (to be removed)
 func main() {
+
+	// Continuous listening ("go") of indication channel
 	go listenIndChan(context.Background(), indCh)
 
+	// Definition for e2t parameters
 	e2tAddress := flag.String("e2tAddress", "", "address of onos-e2t")
 	e2tPort := flag.Int("e2tPort", 0, "port of onos-e2t")
 	topoAddress := flag.String("topoAddress", "", "address of onos-topo")
 	topoPort := flag.Int("topoPort", 0, "port of onos-topo")
 	flag.Parse()
 
+	// Continuous serving of indication
 	go server()
 
 	log.Info("Read from parameters:")
@@ -74,6 +87,7 @@ func main() {
 
 	// https://tutorialedge.net/golang/go-grpc-beginners-tutorial/
 
+	// Manager creating
 	manager.NewManager()
 
 	// Select Log Level
@@ -81,20 +95,25 @@ func main() {
 
 	log.Info("Starting")
 
+	// Definiton of topology client
 	topoClient, err := toposdk.NewClient(toposdk.WithTopoHost(topo_address), toposdk.WithTopoPort(topo_port))
 	if err != nil {
 		log.Warn(err)
 	}
 
+	// Definition of e2 client
 	e2Client := e2client.NewClient(e2client.WithE2TAddress(e2t_address, e2t_port),
 		e2client.WithServiceModel(e2client.ServiceModelName(sm_name),
 			e2client.ServiceModelVersion(sm_ver)))
 
+	// Definition of app context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Definiton of some channel for topology event
 	ch_topo := make(chan topoapi.Event)
 
+	// Filter for indication i guess
 	controlRelationFilter := &topoapi.Filters{
 		KindFilter: &topoapi.Filter{
 			Filter: &topoapi.Filter_Equal_{
@@ -105,12 +124,49 @@ func main() {
 		},
 	}
 
+	// Filter for e2 cell
+	cellEntityFilter := &topoapi.Filters{
+		KindFilter: &topoapi.Filter{
+			Filter: &topoapi.Filter_In{
+				In: &topoapi.InFilter{
+					Values: []string{topo.E2CELL},
+				},
+			},
+		},
+	}
+
+	// List topo objects
+	objs, err := topoClient.List(ctx, toposdk.WithListFilters(cellEntityFilter))
+	if err != nil {
+		log.Warn(err)
+	}
+
+	// For all objects set aspect (something like setting type of cell?)
+	for _, i := range objs {
+		cellObject := &topoapi.E2Cell{}
+		err = i.GetAspect(cellObject)
+		if err != nil {
+			log.Warn(err)
+		}
+		log.Info(cellObject.CellType)
+		cellTypeAspect := &topoapi.E2Cell{
+			CellType: "Macro",
+		}
+		err = i.SetAspect(cellTypeAspect)
+		if err != nil {
+			log.Warn(err)
+		}
+		topoClient.Update(ctx, &i)
+	}
+
+	// Watiching channel by topo client with defined filters
 	log.Info("Watching onos-topo events...")
 	err = topoClient.Watch(ctx, ch_topo, toposdk.WithWatchFilters(controlRelationFilter))
 	if err != nil {
 		log.Warn(err)
 	}
 
+	// For all event from topo channel: first check the
 	for topoEvent := range ch_topo {
 		switch topoEvent.Type {
 		case topoapi.EventType_NONE:
@@ -119,6 +175,12 @@ func main() {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
 			log.Info("e2NodeID: " + e2NodeID)
+
+			obj, err := topoClient.Get(ctx, e2NodeID)
+			if err != nil {
+				log.Warn(err)
+			}
+			log.Info(obj)
 
 			ch_ind := make(chan e2api.Indication)
 			node := e2Client.Node(e2client.NodeID(e2NodeID))
@@ -163,27 +225,28 @@ func main() {
 				log.Warn(err)
 			}
 
-			// streamReader, err := subscriptionBroker.OpenReader(ctx, node, subName, channelID, subSpec)
-			//if err != nil {
-			//	log.Warn(err)
-			//}
-			//ch := make(chan e2api.Indication)
-			//go sendIndicationOnStream(streamReader.StreamID(), ch)
-
-			//go startMonitoring(ctx, streamReader, e2NodeID, indCh, e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC)
-
+			// Setting constant trigger type for periodic reports
 			triggerType := e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC
 
 			log.Info("Sent subscription")
 			//log.Debug("Channel ID: " + channelID)
+
+			// For every received indication
 			for ind := range ch_ind {
+
+				// Determine the header
 				indHeaderByte := ind.Header
+				// Determine the message
 				indMessageByte := ind.Payload
 
 				indHeader := e2sm_mho.E2SmMhoIndicationHeader{}
 				if err = proto.Unmarshal(indHeaderByte, &indHeader); err == nil {
 					indMessage := e2sm_mho.E2SmMhoIndicationMessage{}
+
+					// Probably some conversion of the data
 					if err = proto.Unmarshal(indMessageByte, &indMessage); err == nil {
+
+						// Checking indication is in Format 1 or 2
 						switch x := indMessage.E2SmMhoIndicationMessage.(type) {
 						case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat1:
 							if triggerType == e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_UPON_RCV_MEAS_REPORT {
@@ -197,6 +260,7 @@ func main() {
 						case *e2sm_mho.E2SmMhoIndicationMessage_IndicationMessageFormat2:
 							//go c.handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2())
 							log.Info("Handle rrc state")
+							go handleRrcState(ctx, indHeader.GetIndicationHeaderFormat1(), indMessage.GetIndicationMessageFormat2())
 						default:
 							log.Warnf("Unknown MHO indication message format, indication message: %v", x)
 						}
@@ -217,42 +281,42 @@ func main() {
 	}
 }
 
+// Handling of periodic report
 func handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1) {
-	//mu.Lock()
-	//defer mu.Unlock()
+
+	//Getting cgi and idnetifier of the UE
 	ueID := message.GetUeId().GetValue()
 	cgi := getCGIFromIndicationHeader(header)
 	log.Infof("rx periodic ueID:%v cgi:%v", ueID, cgi)
 
-	// get ue from store (create if it does not exist)
-	// var ueData *UeData
-	// newUe := false
-	// ueData = c.getUe(ctx, ueID)
-	// if ueData == nil {
-	// 	ueData = c.createUe(ctx, ueID)
-	//	c.attachUe(ctx, ueData, cgi)
-	//		newUe = true
-	//} else if ueData.CGIString != cgi {
-	//	return
-	//}
-
+	// Getting RSRP from serving BS and neighbour BS
 	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 	log.Infof("rsrp_serving:%v rsrp_neighbors:%v", rsrpServing, rsrpNeighbors)
 
-	//if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
-	//	return
-	//}
+}
 
-	// update store
-	//ueData.RsrpServing, ueData.RsrpNeighbors = rsrpServing, rsrpNeighbors
-	//c.setUe(ctx, ueData)
+func handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2) {
+
+	ueID := message.GetUeId().GetValue()
+	cgi := getCGIFromIndicationHeader(header)
+	log.Infof("rx rrc ueID:%v cgi:%v", ueID, cgi)
+
+	// set rrc state (takes care of attach/detach as well)
+	newRrcState := message.GetRrcStatus().String()
+	log.Info("rsrp_serving:%v", newRrcState)
 
 }
 
+// Getting RSRP form measuremnet periodic report
 func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
+
+	// RSRP value of serving node
 	var rsrpServing int32
+
+	// Channel for RSPR from neighbour nodes
 	rsrpNeighbors := make(map[string]int32)
 
+	// For every measuremnt report item specify the RSRP from serving node and from neighbour nodes with CGI
 	for _, measReportItem := range measReport {
 		if getNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
 			rsrpServing = measReportItem.GetRsrp().GetValue()
@@ -262,16 +326,27 @@ func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeas
 		}
 	}
 
+	// Returning of RSRP values
 	return rsrpServing, rsrpNeighbors
 }
 
+// Getting CGI from measurement report item
 func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem) string {
+
+	// Node NCI
 	nci := getNciFromCellGlobalID(measReport.GetCgi())
+
+	// Getting bytes from CGI
 	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(measReport.GetCgi())
+
+	// Converting bytes to integer
 	plmnID := plmnIDBytesToInt(plmnIDBytes)
+
+	// Converting to CGI
 	return plmnIDNciToCGI(plmnID, nci)
 }
 
+// Getting CGI from indication header (same as above func but from indication header)
 func getCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {
 	nci := getNciFromCellGlobalID(header.GetCgi())
 	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(header.GetCgi())
@@ -279,22 +354,27 @@ func getCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1)
 	return plmnIDNciToCGI(plmnID, nci)
 }
 
+// Getting NCI from CGI
 func getNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
 	return cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
 }
 
+// Getting  proto buffer (bytes) from CGI
 func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
 	return cellGlobalID.GetNrCgi().GetPLmnIdentity().GetValue()
 }
 
+// Converting bytes to integer
 func plmnIDBytesToInt(b []byte) uint64 {
 	return uint64(b[2])<<16 | uint64(b[1])<<8 | uint64(b[0])
 }
 
+// Getting CGI from bytes and NCI
 func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
 	return strconv.FormatInt(int64(plmnID<<36|(nci&0xfffffffff)), 16)
 }
 
+// Send indication on stream
 func sendIndicationOnStream(streamID broker.StreamID, ch chan e2api.Indication) {
 	log.Info("In sendIndicationOnStream")
 	streamWriter, err := subscriptionBroker.GetWriter(streamID)
@@ -313,6 +393,7 @@ func sendIndicationOnStream(streamID broker.StreamID, ch chan e2api.Indication) 
 	}
 }
 
+// Starting monitoring indications on channel
 func startMonitoring(ctx context.Context, streamReader broker.StreamReader, nodeID topoapi.ID, indChan chan *E2NodeIndication, triggerType e2sm_mho.MhoTriggerType) error {
 	log.Info("In startMonitoring")
 	errCh := make(chan error)
@@ -356,6 +437,7 @@ func processIndication(ctx context.Context, indication e2api.Indication, nodeID 
 	return nil
 }
 
+// Listening indication channel
 func listenIndChan(ctx context.Context, indChan chan *E2NodeIndication) {
 	var err error
 	log.Info("Before listenIndChan loop")
