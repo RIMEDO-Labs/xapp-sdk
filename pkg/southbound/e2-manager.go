@@ -6,13 +6,13 @@ import (
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/monitoring"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
 	e2API "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-mho/pkg/broker"
-	"github.com/onosproject/onos-mho/pkg/rnib"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 	"google.golang.org/protobuf/proto"
 )
@@ -301,4 +301,29 @@ func (self *E2Manager) createSubscriptionActions() []e2API.Action {
 	actions = append(actions, *action)
 	return actions
 
+}
+
+func (self *E2Manager) GetCellTypes(context context.Context) map[string]rnib.Cell {
+
+	cellTypes, err := self.rnibClient.GetCellTypes(context)
+	if err != nil {
+
+		log.Warn("Error occured during getting types of the cells [GetCellTypes()].", err)
+
+	}
+
+	return cellTypes
+}
+
+func (self *E2Manager) SetCellType(context context.Context, cellID string, cellType string) error {
+
+	err := self.rnibClient.SetCellType(context, cellID, cellType)
+	if err != nil {
+
+		log.Warn("Error occured during setting types of the cells [GetCellTypes()].", err)
+		return err
+
+	}
+
+	return nil
 }

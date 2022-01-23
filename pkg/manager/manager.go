@@ -1,6 +1,10 @@
 package manager
 
 import (
+	"context"
+
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/southbound"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/northbound"
@@ -124,7 +128,6 @@ func (self *Manager) startNorthboundServer() error {
 		true,
 		northbound.SecurityConfig{}))
 
-	//TODO - MHO northbound service
 	server.AddService(service.NewService(self.ueStore, self.cellStore))
 
 	errorChannel := make(chan error)
@@ -144,5 +147,40 @@ func (self *Manager) startNorthboundServer() error {
 	}()
 
 	return <-errorChannel
+
+}
+
+func (self *Manager) GetUes(context context.Context) map[string]mho.UeData {
+
+	ueMap := make(map[string]mho.UeData)
+	channelEntries := make(chan *store.Entry, 1024)
+
+	if err := self.ueStore.Entries(context, channelEntries); err != nil {
+
+		log.Warn("Some problem with UE store [GetUes()].", err)
+		return ueMap
+
+	}
+
+	for entry := range channelEntries {
+
+		ueData := entry.Value.(mho.UeData)
+		ueMap[ueData.UeID] = ueData
+
+	}
+
+	return ueMap
+
+}
+
+func (self *Manager) GetCellTypes(context context.Context) map[string]rnib.Cell {
+
+	return self.e2Manager.GetCellTypes(context)
+
+}
+
+func (self *Manager) SetCellType(context context.Context, cellID string, cellType string) error {
+
+	return self.e2Manager.SetCellType(context, cellID, cellType)
 
 }
