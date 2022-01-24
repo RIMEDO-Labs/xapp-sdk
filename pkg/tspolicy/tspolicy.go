@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func (t *TsPolicyObject) readPolicyObjectFromFileV1(jsonPath string) error {
+func (t *TsPolicyObject) ReadPolicyObjectFromFileV1(jsonPath string) error {
 
 	jsonFile, err := LoadTsPolicyJsonFromFile(jsonPath)
 	if err != nil {
@@ -27,11 +27,11 @@ func NewTsPolicyMap() *TsPolicyMap {
 	return &t
 }
 
-func (p *TsPolicyMap) addPolicy(policyId string, policyDir string) error {
+func (p *TsPolicyMap) AddPolicy(policyId string, policyDir string) error {
 
 	var policyObject TsPolicyObject
 	policyPath := policyDir + policyId
-	err := policyObject.readPolicyObjectFromFileV1(policyPath)
+	err := policyObject.ReadPolicyObjectFromFileV1(policyPath)
 	if err != nil {
 		log.Error(fmt.Sprintf("Couldn't read PolicyObject from file \n policyId: %s from: %s", policyId, policyPath))
 		return err
@@ -40,7 +40,7 @@ func (p *TsPolicyMap) addPolicy(policyId string, policyDir string) error {
 	return nil
 }
 
-func (p *TsPolicyMap) enforcePolicy(policyId string) bool {
+func (p *TsPolicyMap) EnforcePolicy(policyId string) bool {
 
 	if _, ok := p.policies[policyId]; ok {
 		p.policies[policyId].isEnforced = true
