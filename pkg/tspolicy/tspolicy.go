@@ -49,3 +49,22 @@ func (p *TsPolicyMap) EnforcePolicy(policyId string) bool {
 	log.Error(fmt.Sprintf("Policy with policyId: %s, not enforced", policyId))
 	return false
 }
+
+func (p *TsPolicyMap) DisablePolicy(policyId string) bool {
+
+	if _, ok := p.policies[policyId]; ok {
+		p.policies[policyId].isEnforced = false
+		return true
+	}
+	log.Error(fmt.Sprintf("Policy with policyId: %s, not enforced", policyId))
+	return false
+}
+
+func (p *TsPolicyMap) GetPolicy(policyId string) (*TsPolicyObject, bool) {
+
+	if val, ok := p.policies[policyId]; ok {
+		return val, ok
+	}
+	log.Error(fmt.Sprintf("Policy with policyId: %s, not enforced", policyId))
+	return nil, false
+}

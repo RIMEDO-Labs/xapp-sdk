@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/onosproject/onos-lib-go/pkg/logging"
+	"github.com/xeipuuv/gojsonschema"
+	// MIT License
 )
 
 var log = logging.GetLogger("jsonTsPolicy")
@@ -29,6 +31,18 @@ func LoadTsPolicyJsonFromFile(path string) ([]byte, error) {
 		return nil, err
 	}
 	return byteValue, nil
+}
+
+func (t *TsPolicySchemaValidatorV1) ValidateTsPolicyJsonSchemaV1(jsonPath string) (bool, error) {
+
+	schemaLoader := gojsonschema.NewReferenceLoader("file://" + t.schemePath)
+	documentLoader := gojsonschema.NewReferenceLoader("file://" + jsonPath)
+
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		return false, err
+	}
+	return result.Valid(), nil
 }
 
 func (t *TsPolicyObject) UnmarshalTsPolicyJson(tsPolicyJson []byte) error {
