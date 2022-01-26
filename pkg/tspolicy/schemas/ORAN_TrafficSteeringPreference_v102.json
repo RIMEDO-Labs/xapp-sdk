@@ -1,0 +1,79 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+
+    "description":"O-RAN standard Traffic Steering Preference policy",
+    "type":"object",
+    "properties": {
+        "scope": {
+            "anyOf": [
+                {
+                    "type":"object",
+                    "properties": {
+                        "ueId": {"$ref": "#/definitions/UeId"},
+                        "sliceId": {"$ref": "#/definitions/SliceId"},
+                        "qosId": {"$ref": "#/definitions/QosId"},
+                        "CellId": {"$ref": "#/definitions/CellId"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["ueId"]
+                },
+                {
+                    "type":"object",
+                    "properties": {
+                        "ueId": {"$ref": "#/definitions/UeId"},
+                        "sliceId": {"$ref": "#/definitions/SliceId"},
+                        "qosId": {"$ref": "#/definitions/QosId"},
+                        "CellId": {"$ref": "#/definitions/CellId"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["SliceId"]
+                }
+            ]
+        },
+        "tspResources": {
+            "type": "array",
+            "items": {
+                "$ref":"#/definitions/TspResource"
+            },
+            "minItems": 1
+        }
+    },
+    "additionalProperties": false,
+    "required": ["scope", "tspResources"],
+
+    "definitions": {
+        "UeId": {"type":"string"},
+        "GroupId": {"type":"number"},
+        "SliceId": {"type":"number"},
+        "QosId": {"type":"number"},
+        "CellId": {"type":"number"},
+
+        "PreferenceType": {
+            "type":"string",
+            "enum": [
+                "SHALL",
+                "PREFER",
+                "AVOID",
+                "FORBID"
+            ]
+        },
+
+        "CellIdList": {
+            "type":"array",
+            "items": {
+                "$ref": "#/definitions/CellId"
+            }
+        },
+
+        "TspResource": {
+            "type":"object",
+            "properties": {
+                "cellIdList": {"$ref": "#/definitions/CellIdList"},
+                "preference": {"$ref": "#/definitions/PreferenceType"},
+                "primary": {"type":"boolean"}
+            },
+            "required": ["cellIdList", "preference"],
+            "additionalProperties": false
+        }
+    }
+}
