@@ -8,6 +8,7 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/southbound/e2"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/tspolicy"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"google.golang.org/grpc"
 )
@@ -15,19 +16,22 @@ import (
 var log = logging.GetLogger("manager")
 
 type Config struct {
-	AppID       string
-	E2tAddress  string
-	E2tPort     int
-	TopoAddress string
-	TopoPort    int
-	SMName      string
-	SMVersion   string
+	AppID              string
+	E2tAddress         string
+	E2tPort            int
+	TopoAddress        string
+	TopoPort           int
+	SMName             string
+	SMVersion          string
+	TSPolicySchemePath string
 }
 
 func NewManager(config Config) *Manager {
 
 	ueStore := store.NewStore()
 	cellStore := store.NewStore()
+
+	policyMap := tspolicy.NewTsPolicyMap(config.TSPolicySchemePath)
 
 	indCh := make(chan *mho.E2NodeIndication)
 
@@ -49,6 +53,7 @@ func NewManager(config Config) *Manager {
 	manager := &Manager{
 		e2Manager: e2Manager,
 		mhoCtrl:   mho.NewController(indCh, ueStore, cellStore),
+		policyMap: *policyMap,
 		ueStore:   ueStore,
 		cellStore: cellStore,
 	}
@@ -58,6 +63,7 @@ func NewManager(config Config) *Manager {
 type Manager struct {
 	e2Manager e2.Manager
 	mhoCtrl   *mho.Controller
+	policyMap tspolicy.TsPolicyMap
 	ueStore   store.Store
 	cellStore store.Store
 }
