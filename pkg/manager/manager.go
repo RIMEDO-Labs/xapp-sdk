@@ -53,7 +53,7 @@ func NewManager(config Config) *Manager {
 	manager := &Manager{
 		e2Manager: e2Manager,
 		mhoCtrl:   mho.NewController(indCh, ueStore, cellStore),
-		policyMap: *policyMap,
+		PolicyMap: *policyMap,
 		ueStore:   ueStore,
 		cellStore: cellStore,
 	}
@@ -63,7 +63,7 @@ func NewManager(config Config) *Manager {
 type Manager struct {
 	e2Manager e2.Manager
 	mhoCtrl   *mho.Controller
-	policyMap tspolicy.TsPolicyMap
+	PolicyMap tspolicy.TsPolicyMap
 	ueStore   store.Store
 	cellStore store.Store
 }
