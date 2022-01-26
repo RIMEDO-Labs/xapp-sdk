@@ -1,17 +1,28 @@
 package tspolicy
 
 import (
+	"errors"
 	"fmt"
 )
 
-func (t *TsPolicyObject) ReadPolicyObjectFromFileV1(jsonPath string) error {
+func (t *TsPolicyObject) ReadPolicyObjectFromFileV1(jsonPath string, validator *TsPolicySchemaValidatorV1) error {
 
 	jsonFile, err := LoadTsPolicyJsonFromFile(jsonPath)
 	if err != nil {
 		log.Error("Couldn't read PolicyObject from file")
 		return err // empty struct??
 	}
-	// TODO: validate against scheme from docs
+
+	// TODO don't load json two times
+	var ok bool
+	ok, err = validator.ValidateTsPolicyJsonSchemaV1(jsonPath)
+	if err != nil {
+		log.Error("Error validating json scheme")
+		return err
+	}
+	if !ok {
+		return errors.New("the json file is invalid")
+	}
 
 	err = t.UnmarshalTsPolicyJson(jsonFile)
 	if err != nil {
@@ -21,9 +32,17 @@ func (t *TsPolicyObject) ReadPolicyObjectFromFileV1(jsonPath string) error {
 	return nil
 }
 
-func NewTsPolicyMap() *TsPolicyMap {
+func NewTsPolicySchemaValidatorV1(path string) *TsPolicySchemaValidatorV1 {
+
+	var t TsPolicySchemaValidatorV1
+	t.schemePath = path
+	return &t
+}
+
+func NewTsPolicyMap(schemePath string) *TsPolicyMap {
 	var t TsPolicyMap
 	t.policies = make(map[string]*TsPolicyObject)
+	t.validator = *NewTsPolicySchemaValidatorV1(schemePath)
 	return &t
 }
 
@@ -31,7 +50,7 @@ func (p *TsPolicyMap) AddPolicy(policyId string, policyDir string) error {
 
 	var policyObject TsPolicyObject
 	policyPath := policyDir + policyId
-	err := policyObject.ReadPolicyObjectFromFileV1(policyPath)
+	err := policyObject.ReadPolicyObjectFromFileV1(policyPath, &p.validator)
 	if err != nil {
 		log.Error(fmt.Sprintf("Couldn't read PolicyObject from file \n policyId: %s from: %s", policyId, policyPath))
 		return err

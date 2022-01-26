@@ -25,7 +25,8 @@ type TsPolicyObject struct {
 
 type TsPolicyMap struct {
 	// Key - string policyId, value - TSPolicyObject
-	policies map[string]*TsPolicyObject
+	policies  map[string]*TsPolicyObject
+	validator TsPolicySchemaValidatorV1
 }
 
 type TsPolicySchemaValidatorV1 struct {
