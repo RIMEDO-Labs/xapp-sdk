@@ -20,7 +20,6 @@
                 {
                     "type":"object",
                     "properties": {
-                        "ueId": {"$ref": "#/definitions/UeId"},
                         "sliceId": {"$ref": "#/definitions/SliceId"},
                         "qosId": {"$ref": "#/definitions/QosId"},
                         "cellId": {"$ref": "#/definitions/CellId"}

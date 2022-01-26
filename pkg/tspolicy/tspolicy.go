@@ -46,6 +46,32 @@ func NewTsPolicyMap(schemePath string) *TsPolicyMap {
 	return &t
 }
 
+func (p *TsPolicyMap) GetPreference(ueScope ScopeV1, queryCellId int) string {
+
+	var preference string = "DEFAULT" // TODO: maybe change
+	for _, policy := range p.policies {
+		if policy.isEnforced {
+			// Check if ueScope match the policy Scope
+			if policy.tsPolicyV1.Scope.UeId == ueScope.UeId &&
+				policy.tsPolicyV1.Scope.QosId == ueScope.QosId &&
+				policy.tsPolicyV1.Scope.SliceId == ueScope.SliceId &&
+				policy.tsPolicyV1.Scope.CellId == ueScope.CellId {
+
+				// Find cell and related preference
+				for _, tspResource := range policy.tsPolicyV1.TspResources {
+
+					for _, cellId := range tspResource.CellIdList {
+						if cellId == queryCellId {
+							preference = tspResource.Preference
+						}
+					}
+				}
+			}
+		}
+	}
+	return preference
+}
+
 func (p *TsPolicyMap) AddPolicy(policyId string, policyDir string) error {
 
 	var policyObject TsPolicyObject
