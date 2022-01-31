@@ -136,6 +136,21 @@ func (m *Manager) GetUEs(ctx context.Context) map[string]mho.UeData {
 	return output
 }
 
+func (m *Manager) GetCells(ctx context.Context) map[string]mho.CellData {
+	output := make(map[string]mho.CellData)
+	chEntries := make(chan *store.Entry, 1024)
+	err := m.cellStore.Entries(ctx, chEntries)
+	if err != nil {
+		log.Warn(err)
+		return output
+	}
+	for entry := range chEntries {
+		cellData := entry.Value.(mho.CellData)
+		output[cellData.CGIString] = cellData
+	}
+	return output
+}
+
 func (m *Manager) GetCellTypes(ctx context.Context) map[string]rnib.Cell {
 	return m.e2Manager.GetCellTypes(ctx)
 }
