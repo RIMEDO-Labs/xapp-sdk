@@ -46,16 +46,74 @@ func NewTsPolicyMap(schemePath string) *TsPolicyMap {
 	return &t
 }
 
+func (p *TsPolicyObject) CheckPerUEPolicy(ueScope ScopeV1) bool {
+	// Check policy scope according to O-RAN WG2.A1TD v1.00
+	// Value 0 identifies empty number field
+
+	// Check if Policy is Per UE
+	if p.tsPolicyV1.Scope.UeId == "" {
+		return false
+	}
+	// Check if UE Id match
+	if p.tsPolicyV1.Scope.UeId != ueScope.UeId {
+		return false
+	}
+
+	// Check for Slice Id
+	if (p.tsPolicyV1.Scope.SliceId != 0) && (p.tsPolicyV1.Scope.SliceId != ueScope.SliceId) {
+		return false
+	}
+
+	// Check for QoS Id
+	if (p.tsPolicyV1.Scope.QosId != 0) && (p.tsPolicyV1.Scope.QosId != ueScope.QosId) {
+		return false
+	}
+
+	// check for cell Id
+	if (p.tsPolicyV1.Scope.CellId != 0) && (p.tsPolicyV1.Scope.CellId != ueScope.CellId) {
+		return false
+	}
+
+	return true
+}
+
+func (p *TsPolicyObject) CheckPerSlicePolicy(ueScope ScopeV1) bool {
+	// Check policy scope according to O-RAN WG2.A1TD v1.00
+	// Value 0 identifies empty number field
+
+	// Check if Policy is Per Slice
+	if p.tsPolicyV1.Scope.SliceId == 0 {
+		return false
+	}
+	// Check if Slice Id match
+	if p.tsPolicyV1.Scope.SliceId != ueScope.SliceId {
+		return false
+	}
+
+	// Check if UE Id exists
+	if p.tsPolicyV1.Scope.UeId != "" {
+		return false
+	}
+
+	// Check for QoS Id
+	if (p.tsPolicyV1.Scope.QosId != 0) && (p.tsPolicyV1.Scope.QosId != ueScope.QosId) {
+		return false
+	}
+
+	// check for cell Id
+	if (p.tsPolicyV1.Scope.CellId != 0) && (p.tsPolicyV1.Scope.CellId != ueScope.CellId) {
+		return false
+	}
+	return true
+}
+
 func (p *TsPolicyMap) GetPreference(ueScope ScopeV1, queryCellId int) string {
 
 	var preference string = "DEFAULT" // TODO: maybe change
 	for _, policy := range p.policies {
 		if policy.isEnforced {
 			// Check if ueScope match the policy Scope
-			if policy.tsPolicyV1.Scope.UeId == ueScope.UeId &&
-				policy.tsPolicyV1.Scope.QosId == ueScope.QosId &&
-				policy.tsPolicyV1.Scope.SliceId == ueScope.SliceId &&
-				policy.tsPolicyV1.Scope.CellId == ueScope.CellId {
+			if policy.CheckPerSlicePolicy(ueScope) || policy.CheckPerUEPolicy(ueScope) {
 
 				// Find cell and related preference
 				for _, tspResource := range policy.tsPolicyV1.TspResources {

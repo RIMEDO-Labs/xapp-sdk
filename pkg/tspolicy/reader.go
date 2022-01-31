@@ -20,14 +20,14 @@ func LoadTsPolicyJsonFromFile(path string) ([]byte, error) {
 		return nil, err
 	}
 
-	log.Debug("Successfully Opened policy JSON File")
+	log.Info("Successfully Opened policy JSON File")
 	// defer the closing of our jsonFile so that we can parse it later on
 	defer jsonFile.Close()
 
 	// read our opened xmlFile as a byte array.
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {
-		log.Error("Failed to open policy JSON File")
+		log.Error("Failed to read data from policy JSON File")
 		return nil, err
 	}
 	return byteValue, nil
