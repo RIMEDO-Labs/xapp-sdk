@@ -173,6 +173,29 @@ func (self *Manager) GetUes(context context.Context) map[string]mho.UeData {
 
 }
 
+func (self *Manager) GetCells(context context.Context) map[string]mho.CellData {
+
+	cellMap := make(map[string]mho.CellData)
+	channelEntries := make(chan *store.Entry, 1024)
+
+	if err := self.cellStore.Entries(context, channelEntries); err != nil {
+
+		log.Warn("Some problem with Cell store [GetCells()].", err)
+		return cellMap
+
+	}
+
+	for entry := range channelEntries {
+
+		cellData := entry.Value.(mho.CellData)
+		cellMap[cellData.CgiString] = cellData
+
+	}
+
+	return cellMap
+
+}
+
 func (self *Manager) GetCellTypes(context context.Context) map[string]rnib.Cell {
 
 	return self.e2Manager.GetCellTypes(context)
