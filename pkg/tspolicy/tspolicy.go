@@ -3,6 +3,7 @@ package tspolicy
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 func (t *TsPolicyObject) ReadPolicyObjectFromFileV1(jsonPath string, validator *TsPolicySchemaValidatorV1) error {
@@ -105,6 +106,27 @@ func (p *TsPolicyObject) CheckPerSlicePolicy(ueScope ScopeV1) bool {
 		return false
 	}
 	return true
+}
+
+func (t *TsPolicyMap) GetTSResultForUE(ueScope ScopeV1, rsrps []int, cellIds []int) int {
+
+	bestCell := -1
+	bestScore := -math.MaxFloat64
+	for i := 0; i < len(rsrps); i++ {
+		preferece := t.GetPreference(ueScope, cellIds[i])
+		score := GetPreferenceScore(preferece, rsrps[i])
+
+		if score > bestScore {
+			bestCell = cellIds[i]
+			bestScore = score
+		}
+	}
+	return bestCell
+}
+
+func GetPreferenceScore(preference string, rsrp int) float64 {
+
+	return float64(rsrp) + float64(POLICY_WEIGHT[preference])
 }
 
 func (p *TsPolicyMap) GetPreference(ueScope ScopeV1, queryCellId int) string {

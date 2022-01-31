@@ -1,5 +1,13 @@
 package tspolicy
 
+var POLICY_WEIGHT = map[string]int{
+	"DEFAULT": 0.0,
+	"PREFER":  8.0,
+	"AVOID":   -8.0,
+	"SHALL":   1000.0,
+	"FORBID":  -1000.0,
+}
+
 type ScopeV1 struct {
 	UeId    string `json:"ueId,omitempty"` // required UeId, ot SliceId for further validation
 	SliceId int    `json:"sliceId,omitempty"`
