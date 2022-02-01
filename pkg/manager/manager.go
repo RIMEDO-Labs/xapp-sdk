@@ -158,3 +158,33 @@ func (m *Manager) GetCellTypes(ctx context.Context) map[string]rnib.Cell {
 func (m *Manager) SetCellType(ctx context.Context, cellID string, cellType string) error {
 	return m.e2Manager.SetCellType(ctx, cellID, cellType)
 }
+
+func (m *Manager) GetCell(ctx context.Context, CGI string) *mho.CellData {
+
+	return m.mhoCtrl.GetCell(ctx, CGI)
+
+}
+
+func (m *Manager) SetCell(ctx context.Context, cell *mho.CellData) {
+
+	m.mhoCtrl.SetCell(ctx, cell)
+
+}
+
+func (m *Manager) AttachUe(ctx context.Context, ue *mho.UeData, CGI string) {
+
+	m.mhoCtrl.AttachUe(ctx, ue, CGI)
+
+}
+
+func (m *Manager) GetUe(ctx context.Context, ueID string) *mho.UeData {
+
+	return m.mhoCtrl.GetUe(ctx, ueID)
+
+}
+
+func (m *Manager) SetUe(ctx context.Context, ueData *mho.UeData) {
+
+	m.mhoCtrl.SetUe(ctx, ueData)
+
+}
