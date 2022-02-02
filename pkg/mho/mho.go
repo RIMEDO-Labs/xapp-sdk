@@ -85,10 +85,10 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
 	newUe := false
-	ueData = c.getUe(ctx, ueID)
+	ueData = c.GetUe(ctx, ueID)
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
-		c.attachUe(ctx, ueData, cgi)
+		ueData = c.CreateUe(ctx, ueID)
+		c.AttachUe(ctx, ueData, cgi)
 		newUe = true
 	} else if ueData.CGIString != cgi {
 		return
@@ -102,7 +102,7 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 
 	// update store
 	ueData.RsrpServing, ueData.RsrpNeighbors = rsrpServing, rsrpNeighbors
-	c.setUe(ctx, ueData)
+	c.SetUe(ctx, ueData)
 
 }
 
@@ -115,10 +115,10 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
+	ueData = c.GetUe(ctx, ueID)
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
-		c.attachUe(ctx, ueData, cgi)
+		ueData = c.CreateUe(ctx, ueID)
+		c.AttachUe(ctx, ueData, cgi)
 	} else if ueData.CGIString != cgi {
 		return
 	}
@@ -131,7 +131,7 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update store
-	c.setUe(ctx, ueData)
+	c.SetUe(ctx, ueData)
 
 	// do the real HO processing
 	// c.HoCtrl.Input(ctx, header, message)
@@ -147,24 +147,24 @@ func (c *Controller) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMh
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.getUe(ctx, ueID)
+	ueData = c.GetUe(ctx, ueID)
 	if ueData == nil {
-		ueData = c.createUe(ctx, ueID)
-		c.attachUe(ctx, ueData, cgi)
+		ueData = c.CreateUe(ctx, ueID)
+		c.AttachUe(ctx, ueData, cgi)
 	} else if ueData.CGIString != cgi {
 		return
 	}
 
 	// set rrc state (takes care of attach/detach as well)
 	newRrcState := message.GetRrcStatus().String()
-	c.setUeRrcState(ctx, ueData, newRrcState, cgi)
+	c.SetUeRrcState(ctx, ueData, newRrcState, cgi)
 
 	// update store
-	c.setUe(ctx, ueData)
+	c.SetUe(ctx, ueData)
 
 }
 
-func (c *Controller) createUe(ctx context.Context, ueID string) *UeData {
+func (c *Controller) CreateUe(ctx context.Context, ueID string) *UeData {
 	if len(ueID) == 0 {
 		panic("bad data")
 	}
@@ -182,7 +182,7 @@ func (c *Controller) createUe(ctx context.Context, ueID string) *UeData {
 	return ueData
 }
 
-func (c *Controller) getUe(ctx context.Context, ueID string) *UeData {
+func (c *Controller) GetUe(ctx context.Context, ueID string) *UeData {
 	var ueData *UeData
 	u, err := c.ueStore.Get(ctx, ueID)
 	if err != nil || u == nil {
@@ -197,48 +197,48 @@ func (c *Controller) getUe(ctx context.Context, ueID string) *UeData {
 	return ueData
 }
 
-func (c *Controller) setUe(ctx context.Context, ueData *UeData) {
+func (c *Controller) SetUe(ctx context.Context, ueData *UeData) {
 	_, err := c.ueStore.Put(ctx, ueData.UeID, *ueData)
 	if err != nil {
 		panic("bad data")
 	}
 }
 
-func (c *Controller) attachUe(ctx context.Context, ueData *UeData, cgi string) {
+func (c *Controller) AttachUe(ctx context.Context, ueData *UeData, cgi string) {
 	// detach ue from current cell
-	c.detachUe(ctx, ueData)
+	c.DetachUe(ctx, ueData)
 
 	// attach ue to new cell
 	ueData.CGIString = cgi
-	c.setUe(ctx, ueData)
-	cell := c.getCell(ctx, cgi)
+	c.SetUe(ctx, ueData)
+	cell := c.GetCell(ctx, cgi)
 	if cell == nil {
-		cell = c.createCell(ctx, cgi)
+		cell = c.CreateCell(ctx, cgi)
 	}
 	cell.Ues[ueData.UeID] = ueData
-	c.setCell(ctx, cell)
+	c.SetCell(ctx, cell)
 }
 
-func (c *Controller) detachUe(ctx context.Context, ueData *UeData) {
+func (c *Controller) DetachUe(ctx context.Context, ueData *UeData) {
 	for _, cell := range c.cells {
 		delete(cell.Ues, ueData.UeID)
 	}
 }
 
-func (c *Controller) setUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string) {
+func (c *Controller) SetUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string) {
 	oldRrcState := ueData.RrcState
 
 	if oldRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] &&
 		newRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)] {
-		c.detachUe(ctx, ueData)
+		c.DetachUe(ctx, ueData)
 	} else if oldRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_IDLE)] &&
 		newRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] {
-		c.attachUe(ctx, ueData, cgi)
+		c.AttachUe(ctx, ueData, cgi)
 	}
 	ueData.RrcState = newRrcState
 }
 
-func (c *Controller) createCell(ctx context.Context, cgi string) *CellData {
+func (c *Controller) CreateCell(ctx context.Context, cgi string) *CellData {
 	if len(cgi) == 0 {
 		panic("bad data")
 	}
@@ -254,7 +254,7 @@ func (c *Controller) createCell(ctx context.Context, cgi string) *CellData {
 	return cellData
 }
 
-func (c *Controller) getCell(ctx context.Context, cgi string) *CellData {
+func (c *Controller) GetCell(ctx context.Context, cgi string) *CellData {
 	var cellData *CellData
 	cell, err := c.cellStore.Get(ctx, cgi)
 	if err != nil || cell == nil {
@@ -268,7 +268,7 @@ func (c *Controller) getCell(ctx context.Context, cgi string) *CellData {
 	return cellData
 }
 
-func (c *Controller) setCell(ctx context.Context, cellData *CellData) {
+func (c *Controller) SetCell(ctx context.Context, cellData *CellData) {
 	if len(cellData.CGIString) == 0 {
 		panic("bad data")
 	}
