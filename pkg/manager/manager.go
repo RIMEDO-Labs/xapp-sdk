@@ -9,6 +9,7 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/southbound/e2"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/tspolicy"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"google.golang.org/grpc"
 )
@@ -177,9 +178,9 @@ func (m *Manager) SetCell(ctx context.Context, cell *mho.CellData) {
 
 }
 
-func (m *Manager) AttachUe(ctx context.Context, ue *mho.UeData, CGI string) {
+func (m *Manager) AttachUe(ctx context.Context, ue *mho.UeData, CGI string, cgiObject *e2sm_mho.CellGlobalId) {
 
-	m.mhoCtrl.AttachUe(ctx, ue, CGI)
+	m.mhoCtrl.AttachUe(ctx, ue, CGI, cgiObject)
 
 }
 

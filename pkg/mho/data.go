@@ -15,6 +15,7 @@ type UeData struct {
 }
 
 type CellData struct {
+	CGI                    *e2sm_mho.CellGlobalId
 	CGIString              string
 	CumulativeHandoversIn  int
 	CumulativeHandoversOut int
