@@ -9,6 +9,7 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/southbound/e2"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/tspolicy"
+	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"google.golang.org/grpc"
@@ -35,6 +36,7 @@ func NewManager(config Config) *Manager {
 	policyMap := tspolicy.NewTsPolicyMap(config.TSPolicySchemePath)
 
 	indCh := make(chan *mho.E2NodeIndication)
+	CtrlReqChs := make(map[string]chan *e2api.ControlMessage)
 
 	options := e2.Options{
 		AppID:       config.AppID,
@@ -46,7 +48,7 @@ func NewManager(config Config) *Manager {
 		SMVersion:   config.SMVersion,
 	}
 
-	e2Manager, err := e2.NewManager(options, indCh)
+	e2Manager, err := e2.NewManager(options, indCh, CtrlReqChs)
 	if err != nil {
 		log.Warn(err)
 	}
