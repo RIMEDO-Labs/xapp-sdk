@@ -55,6 +55,7 @@ func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeas
 			cell := ctrl.GetCell(ctx, CGIString)
 			if cell == nil {
 				cell = ctrl.CreateCell(ctx, CGIString, measReportItem.GetCgi())
+				ctrl.SetCell(ctx, cell)
 			}
 		}
 	}
