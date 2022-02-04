@@ -1,7 +1,6 @@
 package mho
 
 import (
-	"context"
 	"strconv"
 
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
@@ -40,25 +39,4 @@ func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem)
 	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(measReport.GetCgi())
 	plmnID := plmnIDBytesToInt(plmnIDBytes)
 	return plmnIDNciToCGI(plmnID, nci)
-}
-
-func getRsrpFromMeasReport(servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem, ctrl *Controller, ctx context.Context) (int32, map[string]int32) {
-	var rsrpServing int32
-	rsrpNeighbors := make(map[string]int32)
-
-	for _, measReportItem := range measReport {
-		if getNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
-			rsrpServing = measReportItem.GetRsrp().GetValue()
-		} else {
-			CGIString := getCGIFromMeasReportItem(measReportItem)
-			rsrpNeighbors[CGIString] = measReportItem.GetRsrp().GetValue()
-			cell := ctrl.GetCell(ctx, CGIString)
-			if cell == nil {
-				cell = ctrl.CreateCell(ctx, CGIString, measReportItem.GetCgi())
-				ctrl.SetCell(ctx, cell)
-			}
-		}
-	}
-
-	return rsrpServing, rsrpNeighbors
 }

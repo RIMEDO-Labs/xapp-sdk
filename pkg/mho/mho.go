@@ -98,7 +98,7 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	ueData.CGI = cgiObject
 	ueData.E2NodeID = e2NodeID
 
-	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport, c, ctx)
+	rsrpServing, rsrpNeighbors := c.GetRsrpFromMeasReport(ctx, getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
 		return
@@ -133,7 +133,7 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 	ueData.E2NodeID = e2NodeID
 
 	// update rsrp
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport, c, ctx)
+	ueData.RsrpServing, ueData.RsrpNeighbors = c.GetRsrpFromMeasReport(ctx, getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update store
 	c.SetUe(ctx, ueData)
@@ -286,4 +286,25 @@ func (c *Controller) SetCell(ctx context.Context, cellData *CellData) {
 	if err != nil {
 		panic("bad data")
 	}
+}
+
+func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
+	var rsrpServing int32
+	rsrpNeighbors := make(map[string]int32)
+
+	for _, measReportItem := range measReport {
+		if getNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
+			rsrpServing = measReportItem.GetRsrp().GetValue()
+		} else {
+			CGIString := getCGIFromMeasReportItem(measReportItem)
+			rsrpNeighbors[CGIString] = measReportItem.GetRsrp().GetValue()
+			cell := c.GetCell(ctx, CGIString)
+			if cell == nil {
+				cell = c.CreateCell(ctx, CGIString, measReportItem.GetCgi())
+				c.SetCell(ctx, cell)
+			}
+		}
+	}
+
+	return rsrpServing, rsrpNeighbors
 }
