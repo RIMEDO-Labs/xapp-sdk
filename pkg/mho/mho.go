@@ -98,7 +98,7 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	ueData.CGI = cgiObject
 	ueData.E2NodeID = e2NodeID
 
-	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+	rsrpServing, rsrpNeighbors := getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport, c, ctx)
 
 	if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
 		return
@@ -133,7 +133,7 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 	ueData.E2NodeID = e2NodeID
 
 	// update rsrp
-	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+	ueData.RsrpServing, ueData.RsrpNeighbors = getRsrpFromMeasReport(getNciFromCellGlobalID(header.GetCgi()), message.MeasReport, c, ctx)
 
 	// update store
 	c.SetUe(ctx, ueData)
