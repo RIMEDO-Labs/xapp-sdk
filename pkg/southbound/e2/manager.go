@@ -29,7 +29,7 @@ type Options struct {
 	SMVersion   string
 }
 
-func NewManager(options Options, indCh chan *mho.E2NodeIndication, CtrlReqChs map[string]chan *e2api.ControlMessage) (Manager, error) {
+func NewManager(options Options, indCh chan *mho.E2NodeIndication, ctrlReqChs map[string]chan *e2api.ControlMessage) (Manager, error) {
 	//log.Info("Init E2Manager")
 
 	smName := e2client.ServiceModelName(options.SMName)
@@ -56,7 +56,7 @@ func NewManager(options Options, indCh chan *mho.E2NodeIndication, CtrlReqChs ma
 		rnibClient: rnibClient,
 		streams:    broker.NewBroker(),
 		indCh:      indCh,
-		CtrlReqChs: CtrlReqChs,
+		ctrlReqChs: ctrlReqChs,
 	}, nil
 }
 
@@ -65,7 +65,7 @@ type Manager struct {
 	rnibClient rnib.Client
 	streams    broker.Broker
 	indCh      chan *mho.E2NodeIndication
-	CtrlReqChs map[string]chan *e2api.ControlMessage
+	ctrlReqChs map[string]chan *e2api.ControlMessage
 }
 
 func (m *Manager) Start() error {
@@ -110,7 +110,7 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 		if topoEvent.Type == topoapi.EventType_ADDED || topoEvent.Type == topoapi.EventType_NONE {
 			relation := topoEvent.Object.Obj.(*topoapi.Object_Relation)
 			e2NodeID := relation.Relation.TgtEntityID
-			m.CtrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
+			m.ctrlReqChs[string(e2NodeID)] = make(chan *e2api.ControlMessage)
 			// move "flags" somewhere else
 			triggers := make(map[e2sm_mho.MhoTriggerType]bool)
 			triggers[e2sm_mho.MhoTriggerType_MHO_TRIGGER_TYPE_PERIODIC] = true
@@ -137,7 +137,7 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 
 func (m *Manager) watchMHOChanges(ctx context.Context, e2nodeID topoapi.ID) {
 
-	for ctrlReqMsg := range m.CtrlReqChs[string(e2nodeID)] {
+	for ctrlReqMsg := range m.ctrlReqChs[string(e2nodeID)] {
 		go func(ctrlReqMsg *e2api.ControlMessage) {
 			node := m.e2client.Node(e2client.NodeID(e2nodeID))
 			ctrlRespMsg, err := node.Control(ctx, ctrlReqMsg)
@@ -264,8 +264,4 @@ func (m *Manager) SetCellType(ctx context.Context, cellID string, cellType strin
 		return err
 	}
 	return nil
-}
-
-func (m *Manager) GetControlChannelsMap(ctx context.Context) map[string]chan *e2api.ControlMessage {
-	return m.CtrlReqChs
 }

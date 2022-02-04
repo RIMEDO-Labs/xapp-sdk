@@ -36,7 +36,7 @@ func NewManager(config Config) *Manager {
 	policyMap := tspolicy.NewTsPolicyMap(config.TSPolicySchemePath)
 
 	indCh := make(chan *mho.E2NodeIndication)
-	CtrlReqChs := make(map[string]chan *e2api.ControlMessage)
+	ctrlReqChs := make(map[string]chan *e2api.ControlMessage)
 
 	options := e2.Options{
 		AppID:       config.AppID,
@@ -48,27 +48,29 @@ func NewManager(config Config) *Manager {
 		SMVersion:   config.SMVersion,
 	}
 
-	e2Manager, err := e2.NewManager(options, indCh, CtrlReqChs)
+	e2Manager, err := e2.NewManager(options, indCh, ctrlReqChs)
 	if err != nil {
 		log.Warn(err)
 	}
 
 	manager := &Manager{
-		e2Manager: e2Manager,
-		mhoCtrl:   mho.NewController(indCh, ueStore, cellStore),
-		PolicyMap: *policyMap,
-		ueStore:   ueStore,
-		cellStore: cellStore,
+		e2Manager:  e2Manager,
+		mhoCtrl:    mho.NewController(indCh, ueStore, cellStore),
+		PolicyMap:  *policyMap,
+		ueStore:    ueStore,
+		cellStore:  cellStore,
+		ctrlReqChs: ctrlReqChs,
 	}
 	return manager
 }
 
 type Manager struct {
-	e2Manager e2.Manager
-	mhoCtrl   *mho.Controller
-	PolicyMap tspolicy.TsPolicyMap
-	ueStore   store.Store
-	cellStore store.Store
+	e2Manager  e2.Manager
+	mhoCtrl    *mho.Controller
+	PolicyMap  tspolicy.TsPolicyMap
+	ueStore    store.Store
+	cellStore  store.Store
+	ctrlReqChs map[string]chan *e2api.ControlMessage
 }
 
 func (m *Manager) Run() {
@@ -196,4 +198,8 @@ func (m *Manager) SetUe(ctx context.Context, ueData *mho.UeData) {
 
 	m.mhoCtrl.SetUe(ctx, ueData)
 
+}
+
+func (m *Manager) GetControlChannelsMap(ctx context.Context) map[string]chan *e2api.ControlMessage {
+	return m.ctrlReqChs
 }
