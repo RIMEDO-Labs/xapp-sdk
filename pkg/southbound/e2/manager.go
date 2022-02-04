@@ -265,3 +265,7 @@ func (m *Manager) SetCellType(ctx context.Context, cellID string, cellType strin
 	}
 	return nil
 }
+
+func (m *Manager) GetControlChannelsMap(ctx context.Context) map[string]chan *e2api.ControlMessage {
+	return m.CtrlReqChs
+}
