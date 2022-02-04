@@ -128,6 +128,7 @@ func (m *Manager) watchE2Connections(ctx context.Context) error {
 					}(triggerType)
 				}
 			}
+			go m.watchMHOChanges(ctx, e2NodeID)
 		}
 	}
 
