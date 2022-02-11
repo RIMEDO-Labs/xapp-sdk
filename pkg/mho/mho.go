@@ -79,7 +79,7 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
-	cgi := getCGIFromIndicationHeader(header)
+	cgi := GetCGIFromIndicationHeader(header)
 	cgiObject := header.GetCgi()
 	log.Debugf("rx periodic ueID:%v cgi:%v", ueID, cgi)
 
@@ -98,7 +98,7 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	ueData.CGI = cgiObject
 	ueData.E2NodeID = e2NodeID
 
-	rsrpServing, rsrpNeighbors := c.GetRsrpFromMeasReport(ctx, getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+	rsrpServing, rsrpNeighbors := c.GetRsrpFromMeasReport(ctx, GetNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
 		return
@@ -114,7 +114,7 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
-	cgi := getCGIFromIndicationHeader(header)
+	cgi := GetCGIFromIndicationHeader(header)
 	cgiObject := header.GetCgi()
 	log.Debugf("rx a3 ueID:%v cgi:%v", ueID, cgi)
 
@@ -133,7 +133,7 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 	ueData.E2NodeID = e2NodeID
 
 	// update rsrp
-	ueData.RsrpServing, ueData.RsrpNeighbors = c.GetRsrpFromMeasReport(ctx, getNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+	ueData.RsrpServing, ueData.RsrpNeighbors = c.GetRsrpFromMeasReport(ctx, GetNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update store
 	c.SetUe(ctx, ueData)
@@ -147,7 +147,7 @@ func (c *Controller) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMh
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ueID := message.GetUeId().GetValue()
-	cgi := getCGIFromIndicationHeader(header)
+	cgi := GetCGIFromIndicationHeader(header)
 	cgiObject := header.GetCgi()
 	log.Debugf("rx rrc ueID:%v cgi:%v", ueID, cgi)
 
@@ -293,10 +293,10 @@ func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint6
 	rsrpNeighbors := make(map[string]int32)
 
 	for _, measReportItem := range measReport {
-		if getNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
+		if GetNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
 			rsrpServing = measReportItem.GetRsrp().GetValue()
 		} else {
-			CGIString := getCGIFromMeasReportItem(measReportItem)
+			CGIString := GetCGIFromMeasReportItem(measReportItem)
 			rsrpNeighbors[CGIString] = measReportItem.GetRsrp().GetValue()
 			cell := c.GetCell(ctx, CGIString)
 			if cell == nil {

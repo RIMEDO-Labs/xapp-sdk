@@ -6,11 +6,11 @@ import (
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 )
 
-func plmnIDBytesToInt(b []byte) uint64 {
+func PlmnIDBytesToInt(b []byte) uint64 {
 	return uint64(b[2])<<16 | uint64(b[1])<<8 | uint64(b[0])
 }
 
-func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
+func PlmnIDNciToCGI(plmnID uint64, nci uint64) string {
 	return strconv.FormatInt(int64(plmnID<<36|(nci&0xfffffffff)), 16)
 }
 
@@ -19,24 +19,24 @@ func plmnIDNciToCGI(plmnID uint64, nci uint64) string {
 //	return plmnIDBytesToInt(plmnIDBytes)
 //}
 
-func getNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
+func GetNciFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) uint64 {
 	return cellGlobalID.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
 }
 
-func getPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
+func GetPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_mho.CellGlobalId) []byte {
 	return cellGlobalID.GetNrCgi().GetPLmnIdentity().GetValue()
 }
 
-func getCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {
-	nci := getNciFromCellGlobalID(header.GetCgi())
-	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(header.GetCgi())
-	plmnID := plmnIDBytesToInt(plmnIDBytes)
-	return plmnIDNciToCGI(plmnID, nci)
+func GetCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {
+	nci := GetNciFromCellGlobalID(header.GetCgi())
+	plmnIDBytes := GetPlmnIDBytesFromCellGlobalID(header.GetCgi())
+	plmnID := PlmnIDBytesToInt(plmnIDBytes)
+	return PlmnIDNciToCGI(plmnID, nci)
 }
 
-func getCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem) string {
-	nci := getNciFromCellGlobalID(measReport.GetCgi())
-	plmnIDBytes := getPlmnIDBytesFromCellGlobalID(measReport.GetCgi())
-	plmnID := plmnIDBytesToInt(plmnIDBytes)
-	return plmnIDNciToCGI(plmnID, nci)
+func GetCGIFromMeasReportItem(measReport *e2sm_mho.E2SmMhoMeasurementReportItem) string {
+	nci := GetNciFromCellGlobalID(measReport.GetCgi())
+	plmnIDBytes := GetPlmnIDBytesFromCellGlobalID(measReport.GetCgi())
+	plmnID := PlmnIDBytesToInt(plmnIDBytes)
+	return PlmnIDNciToCGI(plmnID, nci)
 }

@@ -208,7 +208,7 @@ func (m *Manager) GetControlChannelsMap(ctx context.Context) map[string]chan *e2
 	return m.ctrlReqChs
 }
 
-func (m *Manager) SwitchUeBetweenCells(ctx context.Context, ueID string, targetCellCGI string, controlChannelsMap map[string]chan *e2api.ControlMessage) {
+func (m *Manager) SwitchUeBetweenCells(ctx context.Context, ueID string, targetCellCGI string) {
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -216,53 +216,73 @@ func (m *Manager) SwitchUeBetweenCells(ctx context.Context, ueID string, targetC
 	availableUes := m.GetUEs(ctx)
 	chosenUe := availableUes[ueID]
 
-	targetCell := m.GetCell(ctx, targetCellCGI)
-	servingCell := m.GetCell(ctx, chosenUe.CGIString)
+	if shouldBeSwitched(chosenUe, targetCellCGI) {
 
-	targetCell.CumulativeHandoversOut++
-	servingCell.CumulativeHandoversIn++
+		targetCell := m.GetCell(ctx, targetCellCGI)
+		servingCell := m.GetCell(ctx, chosenUe.CGIString)
 
-	m.AttachUe(ctx, &chosenUe, targetCellCGI, targetCell.CGI)
+		targetCell.CumulativeHandoversOut++
+		servingCell.CumulativeHandoversIn++
 
-	m.SetCell(ctx, targetCell)
-	m.SetCell(ctx, servingCell)
+		m.AttachUe(ctx, &chosenUe, targetCellCGI, targetCell.CGI)
 
-	controlChannel := controlChannelsMap[chosenUe.E2NodeID]
+		log.Infof("The UE with ID:%v has been attached to the target Cell with CGI:%v.", ueID, targetCellCGI)
 
-	controlHandler := &control.E2SmMhoControlHandler{
-		NodeID:            chosenUe.E2NodeID,
-		ControlAckRequest: e2tAPI.ControlAckRequest_NO_ACK,
-	}
+		m.SetCell(ctx, targetCell)
+		m.SetCell(ctx, servingCell)
 
-	ueIdentity := e2sm_mho.UeIdentity{
-		Value: chosenUe.UeID,
-	}
+		controlChannel := m.ctrlReqChs[chosenUe.E2NodeID]
 
-	servingPlmnIDBytes := servingCell.CGI.GetNrCgi().GetPLmnIdentity().GetValue()
-	servingNCI := servingCell.CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
-	servingNCILen := servingCell.CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
+		controlHandler := &control.E2SmMhoControlHandler{
+			NodeID:            chosenUe.E2NodeID,
+			ControlAckRequest: e2tAPI.ControlAckRequest_NO_ACK,
+		}
 
-	log.Info("Creating Control Message and sending it...")
-	var err error
-	go func() {
-		if controlHandler.ControlHeader, err = controlHandler.CreateMhoControlHeader(servingNCI, servingNCILen, 1, servingPlmnIDBytes); err == nil {
+		ueIdentity := e2sm_mho.UeIdentity{
+			Value: chosenUe.UeID,
+		}
 
-			if controlHandler.ControlMessage, err = controlHandler.CreateMhoControlMessage(servingCell.CGI, &ueIdentity, targetCell.CGI); err == nil {
+		servingPlmnIDBytes := servingCell.CGI.GetNrCgi().GetPLmnIdentity().GetValue()
+		servingNCI := servingCell.CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
+		servingNCILen := servingCell.CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
 
-				if controlRequest, err := controlHandler.CreateMhoControlRequest(); err == nil {
+		log.Info("Creating Control Message and sending it...")
+		var err error
+		go func() {
+			if controlHandler.ControlHeader, err = controlHandler.CreateMhoControlHeader(servingNCI, servingNCILen, 1, servingPlmnIDBytes); err == nil {
 
-					controlChannel <- controlRequest
-					log.Info("Control message: ", <-controlChannel)
+				if controlHandler.ControlMessage, err = controlHandler.CreateMhoControlMessage(servingCell.CGI, &ueIdentity, targetCell.CGI); err == nil {
 
+					if controlRequest, err := controlHandler.CreateMhoControlRequest(); err == nil {
+
+						controlChannel <- controlRequest
+						log.Info("Control message: ", <-controlChannel)
+
+					} else {
+						log.Warn("Control request problem :(", err)
+					}
 				} else {
-					log.Warn("Control request problem :(", err)
+					log.Warn("Control message problem :(", err)
 				}
 			} else {
-				log.Warn("Control message problem :(", err)
+				log.Warn("Control header problem :(", err)
 			}
-		} else {
-			log.Warn("Control header problem :(", err)
-		}
-	}()
+		}()
+
+	} else {
+
+		log.Infof("The UE with ID:%v is already assigned to the Cell with CGI:%v.", ueID, targetCellCGI)
+
+	}
+
+}
+
+func shouldBeSwitched(ue mho.UeData, cgi string) bool {
+
+	servingCgi := ue.CGIString
+	if servingCgi == cgi {
+		return false
+	}
+	return true
 
 }
