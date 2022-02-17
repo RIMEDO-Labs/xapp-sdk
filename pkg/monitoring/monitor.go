@@ -7,7 +7,7 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	e2ind "github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 )

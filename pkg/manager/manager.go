@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
@@ -12,7 +13,8 @@ import (
 	policyAPI "github.com/onosproject/onos-a1-dm/go/policy_schemas/traffic_steering_preference/v2"
 	e2tAPI "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/pdubuilder"
+	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-lib-go/pkg/logging/service"
 	"github.com/onosproject/onos-lib-go/pkg/northbound"
@@ -258,7 +260,7 @@ func (m *Manager) SetCell(ctx context.Context, cell *mho.CellData) {
 
 }
 
-func (m *Manager) AttachUe(ctx context.Context, ue *mho.UeData, CGI string, cgiObject *e2sm_mho.CellGlobalId) {
+func (m *Manager) AttachUe(ctx context.Context, ue *mho.UeData, CGI string, cgiObject *e2sm_v2_ies.Cgi) {
 
 	m.mhoCtrl.AttachUe(ctx, ue, CGI, cgiObject)
 
@@ -338,20 +340,30 @@ func (m *Manager) SwitchUeBetweenCells(ctx context.Context, ueID string, targetC
 			ControlAckRequest: e2tAPI.ControlAckRequest_NO_ACK,
 		}
 
-		ueIdentity := e2sm_mho.UeIdentity{
-			Value: chosenUe.UeID,
+		// ueIdentity := e2sm_mho.UeIdentity{
+		// 	Value: chosenUe.UeID,
+		// }
+		ueIDnum, err := strconv.Atoi(chosenUe.UeID)
+		if err != nil {
+			log.Errorf("SendHORequest() failed to convert string %v to decimal number - assumption is not satisfied (UEID is a decimal number): %v", chosenUe.UeID, err)
 		}
 
-		servingPlmnIDBytes := servingCell.CGI.GetNrCgi().GetPLmnIdentity().GetValue()
-		servingNCI := servingCell.CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetValue()
-		servingNCILen := servingCell.CGI.GetNrCgi().GetNRcellIdentity().GetValue().GetLen()
+		//ToDo - it is necessary to fill in Guami as well.
+		//Should PlmnID come from serving CGI or target CGI??
+		ueIdentity, err := pdubuilder.CreateUeIDGNb(int64(ueIDnum), nil, nil, nil, nil)
+		if err != nil {
+			log.Errorf("SendHORequest() Failed to create UEID: %v", err)
+		}
+
+		servingPlmnIDBytes := servingCell.CGI.GetNRCgi().GetPLmnidentity().GetValue()
+		servingNCI := servingCell.CGI.GetNRCgi().GetNRcellIdentity().GetValue().GetValue()
+		servingNCILen := servingCell.CGI.GetNRCgi().GetNRcellIdentity().GetValue().GetLen()
 
 		log.Info("Creating Control Message and sending it...")
-		var err error
 		go func() {
 			if controlHandler.ControlHeader, err = controlHandler.CreateMhoControlHeader(servingNCI, servingNCILen, 1, servingPlmnIDBytes); err == nil {
 
-				if controlHandler.ControlMessage, err = controlHandler.CreateMhoControlMessage(servingCell.CGI, &ueIdentity, targetCell.CGI); err == nil {
+				if controlHandler.ControlMessage, err = controlHandler.CreateMhoControlMessage(servingCell.CGI, ueIdentity, targetCell.CGI); err == nil {
 
 					if controlRequest, err := controlHandler.CreateMhoControlRequest(); err == nil {
 

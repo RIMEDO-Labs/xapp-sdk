@@ -3,11 +3,14 @@ package mho
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"sync"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
+	"github.com/RIMEDO-Labs/xapp-sdk/pkg/tspolicy"
 	policyAPI "github.com/onosproject/onos-a1-dm/go/policy_schemas/traffic_steering_preference/v2"
-	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
+	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
+	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
 	"google.golang.org/protobuf/proto"
@@ -23,12 +26,17 @@ type E2NodeIndication struct {
 
 func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStore store.Store, onosPolicyStore store.Store) *Controller {
 	// log.Info("Init MhoController")
+
+	policies := make(map[string]*PolicyData)
+
 	return &Controller{
 		IndChan:         indChan,
 		ueStore:         ueStore,
 		cellStore:       cellStore,
 		onosPolicyStore: onosPolicyStore,
 		cells:           make(map[string]*CellData),
+		policies:        policies,
+		policyManager:   tspolicy.NewPolicyManager("", &policies),
 	}
 }
 
@@ -39,6 +47,8 @@ type Controller struct {
 	onosPolicyStore store.Store
 	mu              sync.RWMutex
 	cells           map[string]*CellData
+	policies        map[string]*PolicyData
+	policyManager   *tspolicy.PolicyManager
 }
 
 func (c *Controller) Run(ctx context.Context) {
@@ -81,7 +91,10 @@ func (c *Controller) listenIndChan(ctx context.Context) {
 func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
+	ueID, err := GetUeID(message.GetUeId())
+	if err != nil {
+		log.Errorf("handlePeriodicReport() couldn't extract UeID: %v", err)
+	}
 	cgi := GetCGIFromIndicationHeader(header)
 	cgiObject := header.GetCgi()
 	log.Debugf("rx periodic ueID:%v cgi:%v", ueID, cgi)
@@ -89,9 +102,9 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
 	newUe := false
-	ueData = c.GetUe(ctx, ueID)
+	ueData = c.GetUe(ctx, strconv.Itoa(int(ueID)))
 	if ueData == nil {
-		ueData = c.CreateUe(ctx, ueID)
+		ueData = c.CreateUe(ctx, strconv.Itoa(int(ueID)))
 		c.AttachUe(ctx, ueData, cgi, cgiObject)
 		newUe = true
 	} else if ueData.CGIString != cgi {
@@ -116,16 +129,19 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat1, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
+	ueID, err := GetUeID(message.GetUeId())
+	if err != nil {
+		log.Errorf("handleMeasReport() couldn't extract UeID: %v", err)
+	}
 	cgi := GetCGIFromIndicationHeader(header)
 	cgiObject := header.GetCgi()
 	log.Debugf("rx a3 ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.GetUe(ctx, ueID)
+	ueData = c.GetUe(ctx, strconv.Itoa(int(ueID)))
 	if ueData == nil {
-		ueData = c.CreateUe(ctx, ueID)
+		ueData = c.CreateUe(ctx, strconv.Itoa(int(ueID)))
 		c.AttachUe(ctx, ueData, cgi, cgiObject)
 	} else if ueData.CGIString != cgi {
 		return
@@ -149,16 +165,19 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 func (c *Controller) handleRrcState(ctx context.Context, header *e2sm_mho.E2SmMhoIndicationHeaderFormat1, message *e2sm_mho.E2SmMhoIndicationMessageFormat2, e2NodeID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	ueID := message.GetUeId().GetValue()
+	ueID, err := GetUeID(message.GetUeId())
+	if err != nil {
+		log.Errorf("handleRrcState() couldn't extract UeID: %v", err)
+	}
 	cgi := GetCGIFromIndicationHeader(header)
 	cgiObject := header.GetCgi()
 	log.Debugf("rx rrc ueID:%v cgi:%v", ueID, cgi)
 
 	// get ue from store (create if it does not exist)
 	var ueData *UeData
-	ueData = c.GetUe(ctx, ueID)
+	ueData = c.GetUe(ctx, strconv.Itoa(int(ueID)))
 	if ueData == nil {
-		ueData = c.CreateUe(ctx, ueID)
+		ueData = c.CreateUe(ctx, strconv.Itoa(int(ueID)))
 		c.AttachUe(ctx, ueData, cgi, cgiObject)
 	} else if ueData.CGIString != cgi {
 		return
@@ -216,7 +235,7 @@ func (c *Controller) SetUe(ctx context.Context, ueData *UeData) {
 	}
 }
 
-func (c *Controller) AttachUe(ctx context.Context, ueData *UeData, cgi string, cgiObject *e2sm_mho.CellGlobalId) {
+func (c *Controller) AttachUe(ctx context.Context, ueData *UeData, cgi string, cgiObject *e2sm_v2_ies.Cgi) {
 	// detach ue from current cell
 	c.DetachUe(ctx, ueData)
 
@@ -237,7 +256,7 @@ func (c *Controller) DetachUe(ctx context.Context, ueData *UeData) {
 	}
 }
 
-func (c *Controller) SetUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string, cgiObject *e2sm_mho.CellGlobalId) {
+func (c *Controller) SetUeRrcState(ctx context.Context, ueData *UeData, newRrcState string, cgi string, cgiObject *e2sm_v2_ies.Cgi) {
 	oldRrcState := ueData.RrcState
 
 	if oldRrcState == e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)] &&
@@ -250,7 +269,7 @@ func (c *Controller) SetUeRrcState(ctx context.Context, ueData *UeData, newRrcSt
 	ueData.RrcState = newRrcState
 }
 
-func (c *Controller) CreateCell(ctx context.Context, cgi string, cgiObject *e2sm_mho.CellGlobalId) *CellData {
+func (c *Controller) CreateCell(ctx context.Context, cgi string, cgiObject *e2sm_v2_ies.Cgi) *CellData {
 	if len(cgi) == 0 {
 		panic("bad data")
 	}
@@ -317,14 +336,15 @@ func (c *Controller) CreatePolicy(ctx context.Context, key string, policy *polic
 		panic("bad data")
 	}
 	policyData := &PolicyData{
-		Key: key,
-		API: policy,
+		Key:        key,
+		API:        policy,
+		isEnforced: false,
 	}
 	_, err := c.onosPolicyStore.Put(ctx, key, *policyData)
 	if err != nil {
-		log.Warn(err)
+		log.Panic("bad data")
 	}
-
+	c.policies[policyData.Key] = policyData
 	return policyData
 }
 
