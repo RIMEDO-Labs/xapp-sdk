@@ -2,7 +2,6 @@ package manager
 
 import (
 	"context"
-	"net"
 	"sync"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
@@ -10,12 +9,14 @@ import (
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/southbound/e2"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/tspolicy"
+	policyAPI "github.com/onosproject/onos-a1-dm/go/policy_schemas/traffic_steering_preference/v2"
 	e2tAPI "github.com/onosproject/onos-api/go/onos/e2t/e2"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
+	"github.com/onosproject/onos-lib-go/pkg/logging/service"
+	"github.com/onosproject/onos-lib-go/pkg/northbound"
 	control "github.com/onosproject/onos-mho/pkg/mho"
-	"google.golang.org/grpc"
 )
 
 var log = logging.GetLogger("manager")
@@ -35,6 +36,7 @@ func NewManager(config Config) *Manager {
 
 	ueStore := store.NewStore()
 	cellStore := store.NewStore()
+	onosPolicyStore := store.NewStore()
 
 	policyMap := tspolicy.NewTsPolicyMap(config.TSPolicySchemePath)
 
@@ -57,24 +59,29 @@ func NewManager(config Config) *Manager {
 	}
 
 	manager := &Manager{
-		e2Manager:  e2Manager,
-		mhoCtrl:    mho.NewController(indCh, ueStore, cellStore),
-		PolicyMap:  *policyMap,
-		ueStore:    ueStore,
-		cellStore:  cellStore,
-		ctrlReqChs: ctrlReqChs,
+		e2Manager:       e2Manager,
+		mhoCtrl:         mho.NewController(indCh, ueStore, cellStore, onosPolicyStore),
+		PolicyMap:       *policyMap,
+		ueStore:         ueStore,
+		cellStore:       cellStore,
+		onosPolicyStore: onosPolicyStore,
+		ctrlReqChs:      ctrlReqChs,
+		services:        []service.Service{},
+		mutex:           sync.RWMutex{},
 	}
 	return manager
 }
 
 type Manager struct {
-	e2Manager  e2.Manager
-	mhoCtrl    *mho.Controller
-	PolicyMap  tspolicy.TsPolicyMap
-	ueStore    store.Store
-	cellStore  store.Store
-	ctrlReqChs map[string]chan *e2api.ControlMessage
-	mutex      sync.RWMutex
+	e2Manager       e2.Manager
+	mhoCtrl         *mho.Controller
+	PolicyMap       tspolicy.TsPolicyMap
+	ueStore         store.Store
+	cellStore       store.Store
+	onosPolicyStore store.Store
+	ctrlReqChs      map[string]chan *e2api.ControlMessage
+	services        []service.Service
+	mutex           sync.RWMutex
 }
 
 func (m *Manager) Run() {
@@ -85,7 +92,7 @@ func (m *Manager) Run() {
 }
 
 func (m *Manager) start() error {
-	go m.startNorthboundServer()
+	m.startNorthboundServer()
 	err := m.e2Manager.Start()
 	if err != nil {
 		log.Warn(err)
@@ -124,16 +131,49 @@ func (m *Manager) start() error {
 
 func (m *Manager) startNorthboundServer() error {
 	// ONLY FOR NOW TO LISTEN ON PORT
-	lis, err := net.Listen("tcp", ":5150")
-	if err != nil {
-		log.Fatal("Failed to listen: %v", err)
-	}
-	grpcServer := grpc.NewServer()
+	// lis, err := net.Listen("tcp", ":5150")
+	// if err != nil {
+	// 	log.Fatal("Failed to listen: %v", err)
+	// }
+	// grpcServer := grpc.NewServer()
 
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatal("Failed to serve: %s", err)
+	// for i := range m.services {
+	// 	m.services[i].Register(grpcServer)
+	// }
+
+	// if err := grpcServer.Serve(lis); err != nil {
+	// 	log.Fatal("Failed to serve: %s", err)
+	// }
+	// return nil
+	s := northbound.NewServer(northbound.NewServerCfg(
+		"",
+		"",
+		"",
+		int16(5150),
+		true,
+		northbound.SecurityConfig{}))
+
+	for i := range m.services {
+		s.AddService(m.services[i])
 	}
-	return nil
+
+	doneCh := make(chan error)
+	go func() {
+		err := s.Serve(func(started string) {
+			log.Info("Started NBI on ", started)
+			close(doneCh)
+		})
+		if err != nil {
+			doneCh <- err
+		}
+	}()
+	return <-doneCh
+}
+
+func (m *Manager) AddService(service service.Service) {
+
+	m.services = append(m.services, service)
+
 }
 
 func (m *Manager) GetUEs(ctx context.Context) map[string]mho.UeData {
@@ -165,6 +205,38 @@ func (m *Manager) GetCells(ctx context.Context) map[string]mho.CellData {
 	}
 	return output
 }
+
+func (m *Manager) GetPolicies(ctx context.Context) map[string]mho.PolicyData {
+	output := make(map[string]mho.PolicyData)
+	chEntries := make(chan *store.Entry, 1024)
+	err := m.onosPolicyStore.Entries(ctx, chEntries)
+	if err != nil {
+		log.Warn(err)
+		return output
+	}
+	for entry := range chEntries {
+		policyData := entry.Value.(mho.PolicyData)
+		output[policyData.Key] = policyData
+	}
+	return output
+}
+
+// func (m *Manager) GetMeasurements(ctx context.Context) map[string]measurements.MeasurementItem {
+// 	counter := 0
+// 	output := make(map[string]measurements.MeasurementItem)
+// 	chEntries := make(chan *store.Entry, 1024)
+// 	err := m.services[0]..Entries(ctx, chEntries)
+// 	if err != nil {
+// 		log.Warn(err)
+// 		return output
+// 	}
+// 	for entry := range chEntries {
+// 		measurementData := entry.Value.(measurements.MeasurementItem)
+// 		output[strconv.FormatInt(int64(counter), 10)] = measurementData
+// 		counter++
+// 	}
+// 	return output
+// }
 
 func (m *Manager) GetCellTypes(ctx context.Context) map[string]rnib.Cell {
 	return m.e2Manager.GetCellTypes(ctx)
@@ -202,6 +274,34 @@ func (m *Manager) SetUe(ctx context.Context, ueData *mho.UeData) {
 
 	m.mhoCtrl.SetUe(ctx, ueData)
 
+}
+
+func (m *Manager) CreatePolicy(ctx context.Context, key string, policy *policyAPI.API) *mho.PolicyData {
+
+	return m.mhoCtrl.CreatePolicy(ctx, key, policy)
+
+}
+
+func (m *Manager) GetPolicy(ctx context.Context, key string) *mho.PolicyData {
+
+	return m.mhoCtrl.GetPolicy(ctx, key)
+
+}
+
+func (m *Manager) SetPolicy(ctx context.Context, key string, policy *mho.PolicyData) {
+
+	m.mhoCtrl.SetPolicy(ctx, key, policy)
+
+}
+
+func (m *Manager) DeletePolicy(ctx context.Context, key string) {
+
+	m.mhoCtrl.DeletePolicy(ctx, key)
+
+}
+
+func (m *Manager) GetPolicyStore() *store.Store {
+	return m.mhoCtrl.GetPolicyStore()
 }
 
 func (m *Manager) GetControlChannelsMap(ctx context.Context) map[string]chan *e2api.ControlMessage {

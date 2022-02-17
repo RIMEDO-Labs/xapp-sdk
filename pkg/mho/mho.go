@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
+	policyAPI "github.com/onosproject/onos-a1-dm/go/policy_schemas/traffic_steering_preference/v2"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho/v1/e2sm-mho"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	"github.com/onosproject/onos-ric-sdk-go/pkg/e2/indication"
@@ -20,22 +21,24 @@ type E2NodeIndication struct {
 	IndMsg      indication.Indication
 }
 
-func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStore store.Store) *Controller {
+func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStore store.Store, onosPolicyStore store.Store) *Controller {
 	// log.Info("Init MhoController")
 	return &Controller{
-		IndChan:   indChan,
-		ueStore:   ueStore,
-		cellStore: cellStore,
-		cells:     make(map[string]*CellData),
+		IndChan:         indChan,
+		ueStore:         ueStore,
+		cellStore:       cellStore,
+		onosPolicyStore: onosPolicyStore,
+		cells:           make(map[string]*CellData),
 	}
 }
 
 type Controller struct {
-	IndChan   chan *E2NodeIndication
-	ueStore   store.Store
-	cellStore store.Store
-	mu        sync.RWMutex
-	cells     map[string]*CellData
+	IndChan         chan *E2NodeIndication
+	ueStore         store.Store
+	cellStore       store.Store
+	onosPolicyStore store.Store
+	mu              sync.RWMutex
+	cells           map[string]*CellData
 }
 
 func (c *Controller) Run(ctx context.Context) {
@@ -307,4 +310,52 @@ func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint6
 	}
 
 	return rsrpServing, rsrpNeighbors
+}
+
+func (c *Controller) CreatePolicy(ctx context.Context, key string, policy *policyAPI.API) *PolicyData {
+	if len(key) == 0 {
+		panic("bad data")
+	}
+	policyData := &PolicyData{
+		Key: key,
+		API: policy,
+	}
+	_, err := c.onosPolicyStore.Put(ctx, key, *policyData)
+	if err != nil {
+		log.Warn(err)
+	}
+
+	return policyData
+}
+
+func (c *Controller) GetPolicy(ctx context.Context, key string) *PolicyData {
+	var policy *PolicyData
+	p, err := c.onosPolicyStore.Get(ctx, key)
+	if err != nil || p == nil {
+		return nil
+	}
+	t := p.Value.(PolicyData)
+	if t.Key != key {
+		panic("bad data")
+	}
+	policy = &t
+
+	return policy
+}
+
+func (c *Controller) SetPolicy(ctx context.Context, key string, policy *PolicyData) {
+	_, err := c.onosPolicyStore.Put(ctx, key, *policy)
+	if err != nil {
+		panic("bad data")
+	}
+}
+
+func (c *Controller) DeletePolicy(ctx context.Context, key string) {
+	if err := c.onosPolicyStore.Delete(ctx, key); err != nil {
+		panic("bad data")
+	}
+}
+
+func (c *Controller) GetPolicyStore() *store.Store {
+	return &c.onosPolicyStore
 }
