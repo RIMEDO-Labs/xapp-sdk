@@ -26,5 +26,5 @@ type CellData struct {
 type PolicyData struct {
 	Key        string
 	API        *policyAPI.API
-	isEnforced bool
+	IsEnforced bool
 }

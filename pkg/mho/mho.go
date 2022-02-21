@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/store"
-	"github.com/RIMEDO-Labs/xapp-sdk/pkg/tspolicy"
 	policyAPI "github.com/onosproject/onos-a1-dm/go/policy_schemas/traffic_steering_preference/v2"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
@@ -24,10 +23,8 @@ type E2NodeIndication struct {
 	IndMsg      indication.Indication
 }
 
-func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStore store.Store, onosPolicyStore store.Store) *Controller {
+func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStore store.Store, onosPolicyStore store.Store, policies map[string]*PolicyData) *Controller {
 	// log.Info("Init MhoController")
-
-	policies := make(map[string]*PolicyData)
 
 	return &Controller{
 		IndChan:         indChan,
@@ -36,7 +33,7 @@ func NewController(indChan chan *E2NodeIndication, ueStore store.Store, cellStor
 		onosPolicyStore: onosPolicyStore,
 		cells:           make(map[string]*CellData),
 		policies:        policies,
-		policyManager:   tspolicy.NewPolicyManager("", &policies),
+		// policyManager:   tspolicy.NewPolicyManager("", &policies),
 	}
 }
 
@@ -48,7 +45,7 @@ type Controller struct {
 	mu              sync.RWMutex
 	cells           map[string]*CellData
 	policies        map[string]*PolicyData
-	policyManager   *tspolicy.PolicyManager
+	// policyManager   *tspolicy.PolicyManager
 }
 
 func (c *Controller) Run(ctx context.Context) {
@@ -338,7 +335,7 @@ func (c *Controller) CreatePolicy(ctx context.Context, key string, policy *polic
 	policyData := &PolicyData{
 		Key:        key,
 		API:        policy,
-		isEnforced: false,
+		IsEnforced: false,
 	}
 	_, err := c.onosPolicyStore.Put(ctx, key, *policyData)
 	if err != nil {

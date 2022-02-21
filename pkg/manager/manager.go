@@ -40,7 +40,10 @@ func NewManager(config Config) *Manager {
 	cellStore := store.NewStore()
 	onosPolicyStore := store.NewStore()
 
-	policyMap := tspolicy.NewTsPolicyMap(config.TSPolicySchemePath)
+	//TO REMOVE
+	// policyMap := tspolicy.NewTsPolicyMap(config.TSPolicySchemePath)
+
+	policyMap := make(map[string]*mho.PolicyData)
 
 	indCh := make(chan *mho.E2NodeIndication)
 	ctrlReqChs := make(map[string]chan *e2api.ControlMessage)
@@ -61,9 +64,10 @@ func NewManager(config Config) *Manager {
 	}
 
 	manager := &Manager{
-		e2Manager:       e2Manager,
-		mhoCtrl:         mho.NewController(indCh, ueStore, cellStore, onosPolicyStore),
-		PolicyMap:       *policyMap,
+		e2Manager:     e2Manager,
+		mhoCtrl:       mho.NewController(indCh, ueStore, cellStore, onosPolicyStore, policyMap),
+		policyManager: tspolicy.NewPolicyManager(config.TSPolicySchemePath, &policyMap),
+		// PolicyMap:       *policyMap,
 		ueStore:         ueStore,
 		cellStore:       cellStore,
 		onosPolicyStore: onosPolicyStore,
@@ -75,9 +79,10 @@ func NewManager(config Config) *Manager {
 }
 
 type Manager struct {
-	e2Manager       e2.Manager
-	mhoCtrl         *mho.Controller
-	PolicyMap       tspolicy.TsPolicyMap
+	e2Manager     e2.Manager
+	mhoCtrl       *mho.Controller
+	policyManager *tspolicy.PolicyManager
+	// PolicyMap       tspolicy.TsPolicyMap
 	ueStore         store.Store
 	cellStore       store.Store
 	onosPolicyStore store.Store

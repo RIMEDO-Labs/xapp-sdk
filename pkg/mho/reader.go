@@ -3,6 +3,7 @@ package mho
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
 	e2sm_v2_ies "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-v2-ies"
@@ -27,6 +28,22 @@ func GetNciFromCellGlobalID(cellGlobalID *e2sm_v2_ies.Cgi) uint64 {
 
 func GetPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_v2_ies.Cgi) []byte {
 	return cellGlobalID.GetNRCgi().GetPLmnidentity().GetValue()
+}
+
+func GetMccMncFromPlmnID(plmnId uint64) (string, string) {
+	plmnIdString := strconv.FormatUint(plmnId, 16)
+	mcc := ReverseString(plmnIdString[0:2]) + strings.ReplaceAll(ReverseString(plmnIdString[2:4]), "f", "")
+	mcn := ReverseString(plmnIdString[4:6])
+
+	return mcc, mcn
+}
+
+func ReverseString(str string) string {
+	byte_str := []rune(str)
+	for i, j := 0, len(byte_str)-1; i < j; i, j = i+1, j-1 {
+		byte_str[i], byte_str[j] = byte_str[j], byte_str[i]
+	}
+	return string(byte_str)
 }
 
 func GetCGIFromIndicationHeader(header *e2sm_mho.E2SmMhoIndicationHeaderFormat1) string {

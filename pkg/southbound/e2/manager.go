@@ -3,21 +3,28 @@ package e2
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/broker"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/mho"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/monitoring"
 	"github.com/RIMEDO-Labs/xapp-sdk/pkg/rnib"
+	prototypes "github.com/gogo/protobuf/types"
 	e2api "github.com/onosproject/onos-api/go/onos/e2t/e2/v1beta1"
 	topoapi "github.com/onosproject/onos-api/go/onos/topo"
 	"github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/pdubuilder"
 	e2sm_mho "github.com/onosproject/onos-e2-sm/servicemodels/e2sm_mho_go/v2/e2sm-mho-go"
+	"github.com/onosproject/onos-lib-go/pkg/errors"
 	"github.com/onosproject/onos-lib-go/pkg/logging"
 	e2client "github.com/onosproject/onos-ric-sdk-go/pkg/e2/v1beta1"
 	"google.golang.org/protobuf/proto"
 )
 
 var log = logging.GetLogger("e2", "manager")
+
+const (
+	oid = "1.3.6.1.4.1.53148.1.2.2.101"
+)
 
 type Options struct {
 	AppID       string
@@ -52,20 +59,22 @@ func NewManager(options Options, indCh chan *mho.E2NodeIndication, ctrlReqChs ma
 	}
 
 	return Manager{
-		e2client:   e2Client,
-		rnibClient: rnibClient,
-		streams:    broker.NewBroker(),
-		indCh:      indCh,
-		ctrlReqChs: ctrlReqChs,
+		e2client:    e2Client,
+		rnibClient:  rnibClient,
+		streams:     broker.NewBroker(),
+		indCh:       indCh,
+		ctrlReqChs:  ctrlReqChs,
+		smModelName: smName,
 	}, nil
 }
 
 type Manager struct {
-	e2client   e2client.Client
-	rnibClient rnib.Client
-	streams    broker.Broker
-	indCh      chan *mho.E2NodeIndication
-	ctrlReqChs map[string]chan *e2api.ControlMessage
+	e2client    e2client.Client
+	rnibClient  rnib.Client
+	streams     broker.Broker
+	indCh       chan *mho.E2NodeIndication
+	ctrlReqChs  map[string]chan *e2api.ControlMessage
+	smModelName e2client.ServiceModelName
 }
 
 func (m *Manager) Start() error {
@@ -161,6 +170,18 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 
 	actions := m.createSubscriptionActions()
 
+	aspects, err := m.rnibClient.GetE2NodeAspects(ctx, e2nodeID)
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
+
+	_, err = m.getRanFunction(aspects.ServiceModels)
+	if err != nil {
+		log.Warn(err)
+		return err
+	}
+
 	ch := make(chan e2api.Indication)
 	node := m.e2client.Node(e2client.NodeID(e2nodeID))
 	subName := fmt.Sprintf("xapp-sdk-subscription-%s", triggerType)
@@ -191,6 +212,26 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 	}
 
 	return nil
+}
+
+func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceModelInfo) (*topoapi.MHORanFunction, error) {
+	for _, sm := range serviceModelsInfo {
+		smName := strings.ToLower(sm.Name)
+		if smName == string(m.smModelName) && sm.OID == oid {
+			mhoRanFunction := &topoapi.MHORanFunction{}
+			for _, ranFunction := range sm.RanFunctions {
+				if ranFunction.TypeUrl == ranFunction.GetTypeUrl() {
+					err := prototypes.UnmarshalAny(ranFunction, mhoRanFunction)
+					if err != nil {
+						return nil, err
+					}
+					return mhoRanFunction, nil
+				}
+			}
+		}
+	}
+	return nil, errors.New(errors.NotFound, "cannot retrieve ran functions")
+
 }
 
 func (m *Manager) createEventTrigger(triggerType e2sm_mho.MhoTriggerType) ([]byte, error) {

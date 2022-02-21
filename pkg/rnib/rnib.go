@@ -130,3 +130,15 @@ func (c *Client) SetCellType(ctx context.Context, id string, cellType string) er
 
 	return nil
 }
+
+func (c *Client) GetE2NodeAspects(ctx context.Context, nodeID topoapi.ID) (*topoapi.E2Node, error) {
+	object, err := c.client.Get(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	e2Node := &topoapi.E2Node{}
+	err = object.GetAspect(e2Node)
+
+	return e2Node, err
+
+}
