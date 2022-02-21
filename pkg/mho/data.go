@@ -6,13 +6,15 @@ import (
 )
 
 type UeData struct {
-	UeID          string
-	E2NodeID      string
-	CGI           *e2sm_v2_ies.Cgi
-	CGIString     string
-	RrcState      string
-	RsrpServing   int32
-	RsrpNeighbors map[string]int32
+	UeID            string
+	E2NodeID        string
+	CGI             *e2sm_v2_ies.Cgi
+	CGIString       string
+	RrcState        string
+	RsrpServing     int32
+	RsrpNeighbors   map[string]int32
+	FiveQiServing   int32
+	FiveQiNeighbors map[string]int32
 }
 
 type CellData struct {

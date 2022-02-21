@@ -170,17 +170,20 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 
 	actions := m.createSubscriptionActions()
 
-	aspects, err := m.rnibClient.GetE2NodeAspects(ctx, e2nodeID)
-	if err != nil {
-		log.Warn(err)
-		return err
-	}
+	// aspects, err := m.rnibClient.GetE2NodeAspects(ctx, e2nodeID)
+	//log.Info(aspects)
+	/*
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
 
-	_, err = m.getRanFunction(aspects.ServiceModels)
-	if err != nil {
-		log.Warn(err)
-		return err
-	}
+		_, err = m.getRanFunction(aspects.ServiceModels)
+		if err != nil {
+			log.Warn(err)
+			return err
+		}
+	*/
 
 	ch := make(chan e2api.Indication)
 	node := m.e2client.Node(e2client.NodeID(e2nodeID))
@@ -217,6 +220,8 @@ func (m *Manager) createSubscription(ctx context.Context, e2nodeID topoapi.ID, t
 func (m *Manager) getRanFunction(serviceModelsInfo map[string]*topoapi.ServiceModelInfo) (*topoapi.MHORanFunction, error) {
 	for _, sm := range serviceModelsInfo {
 		smName := strings.ToLower(sm.Name)
+		log.Info(m.smModelName)
+		log.Info(sm.OID)
 		if smName == string(m.smModelName) && sm.OID == oid {
 			mhoRanFunction := &topoapi.MHORanFunction{}
 			for _, ranFunction := range sm.RanFunctions {

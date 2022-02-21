@@ -113,6 +113,9 @@ func (c *Controller) handlePeriodicReport(ctx context.Context, header *e2sm_mho.
 
 	rsrpServing, rsrpNeighbors := c.GetRsrpFromMeasReport(ctx, GetNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
+	// update fiveQi
+	ueData.FiveQiServing, ueData.FiveQiNeighbors = c.GetFiveQiFromMeasReport(ctx, GetNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+
 	if !newUe && rsrpServing == ueData.RsrpServing && reflect.DeepEqual(rsrpNeighbors, ueData.RsrpNeighbors) {
 		return
 	}
@@ -150,6 +153,9 @@ func (c *Controller) handleMeasReport(ctx context.Context, header *e2sm_mho.E2Sm
 
 	// update rsrp
 	ueData.RsrpServing, ueData.RsrpNeighbors = c.GetRsrpFromMeasReport(ctx, GetNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
+
+	// update fiveQi
+	ueData.FiveQiServing, ueData.FiveQiNeighbors = c.GetFiveQiFromMeasReport(ctx, GetNciFromCellGlobalID(header.GetCgi()), message.MeasReport)
 
 	// update store
 	c.SetUe(ctx, ueData)
@@ -307,11 +313,52 @@ func (c *Controller) SetCell(ctx context.Context, cellData *CellData) {
 	}
 }
 
+func (c *Controller) GetFiveQiFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
+	var fiveQiServing int32
+	fiveQiNeighbors := make(map[string]int32)
+
+	for _, measReportItem := range measReport {
+
+		if GetNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
+			fiveQi := measReportItem.GetFiveQi()
+			if fiveQi != nil {
+				fiveQiServing = fiveQi.GetValue()
+			} else {
+				fiveQiServing = -1
+			}
+		} else {
+			CGIString := GetCGIFromMeasReportItem(measReportItem)
+			fiveQi := measReportItem.GetFiveQi()
+			if fiveQi != nil {
+				fiveQiNeighbors[CGIString] = fiveQi.GetValue()
+			} else {
+				fiveQiNeighbors[CGIString] = -1
+			}
+			cell := c.GetCell(ctx, CGIString)
+			if cell == nil {
+				cell = c.CreateCell(ctx, CGIString, measReportItem.GetCgi())
+				c.SetCell(ctx, cell)
+			}
+		}
+	}
+
+	return fiveQiServing, fiveQiNeighbors
+}
+
 func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
 	var rsrpServing int32
 	rsrpNeighbors := make(map[string]int32)
 
 	for _, measReportItem := range measReport {
+		/*
+			five := measReportItem.GetFiveQi()
+			if five != nil {
+				log.Info("COS JEST") // .GetValue()
+			} else {
+				log.Info("NIC NIE MA")
+			}
+		*/
+
 		if GetNciFromCellGlobalID(measReportItem.GetCgi()) == servingNci {
 			rsrpServing = measReportItem.GetRsrp().GetValue()
 		} else {
