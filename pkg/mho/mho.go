@@ -206,7 +206,7 @@ func (c *Controller) CreateUe(ctx context.Context, ueID string) *UeData {
 		UeID:          ueID,
 		CGIString:     "",
 		RrcState:      e2sm_mho.Rrcstatus_name[int32(e2sm_mho.Rrcstatus_RRCSTATUS_CONNECTED)],
-		RsrpNeighbors: make(map[string]int32),
+		RsrpNeighbors: make(map[*e2sm_v2_ies.Cgi]int32),
 	}
 	_, err := c.ueStore.Put(ctx, ueID, *ueData)
 	if err != nil {
@@ -311,11 +311,12 @@ func (c *Controller) SetCell(ctx context.Context, cellData *CellData) {
 	if err != nil {
 		panic("bad data")
 	}
+	c.cells[cellData.CGIString] = cellData
 }
 
-func (c *Controller) GetFiveQiFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
+func (c *Controller) GetFiveQiFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[*e2sm_v2_ies.Cgi]int32) {
 	var fiveQiServing int32
-	fiveQiNeighbors := make(map[string]int32)
+	fiveQiNeighbors := make(map[*e2sm_v2_ies.Cgi]int32)
 
 	for _, measReportItem := range measReport {
 
@@ -330,9 +331,9 @@ func (c *Controller) GetFiveQiFromMeasReport(ctx context.Context, servingNci uin
 			CGIString := GetCGIFromMeasReportItem(measReportItem)
 			fiveQi := measReportItem.GetFiveQi()
 			if fiveQi != nil {
-				fiveQiNeighbors[CGIString] = fiveQi.GetValue()
+				fiveQiNeighbors[measReportItem.GetCgi()] = fiveQi.GetValue()
 			} else {
-				fiveQiNeighbors[CGIString] = -1
+				fiveQiNeighbors[measReportItem.GetCgi()] = -1
 			}
 			cell := c.GetCell(ctx, CGIString)
 			if cell == nil {
@@ -345,9 +346,9 @@ func (c *Controller) GetFiveQiFromMeasReport(ctx context.Context, servingNci uin
 	return fiveQiServing, fiveQiNeighbors
 }
 
-func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[string]int32) {
+func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint64, measReport []*e2sm_mho.E2SmMhoMeasurementReportItem) (int32, map[*e2sm_v2_ies.Cgi]int32) {
 	var rsrpServing int32
-	rsrpNeighbors := make(map[string]int32)
+	rsrpNeighbors := make(map[*e2sm_v2_ies.Cgi]int32)
 
 	for _, measReportItem := range measReport {
 		/*
@@ -363,7 +364,7 @@ func (c *Controller) GetRsrpFromMeasReport(ctx context.Context, servingNci uint6
 			rsrpServing = measReportItem.GetRsrp().GetValue()
 		} else {
 			CGIString := GetCGIFromMeasReportItem(measReportItem)
-			rsrpNeighbors[CGIString] = measReportItem.GetRsrp().GetValue()
+			rsrpNeighbors[measReportItem.GetCgi()] = measReportItem.GetRsrp().GetValue()
 			cell := c.GetCell(ctx, CGIString)
 			if cell == nil {
 				cell = c.CreateCell(ctx, CGIString, measReportItem.GetCgi())
@@ -412,6 +413,7 @@ func (c *Controller) SetPolicy(ctx context.Context, key string, policy *PolicyDa
 	if err != nil {
 		panic("bad data")
 	}
+	c.policies[policy.Key] = policy
 }
 
 func (c *Controller) DeletePolicy(ctx context.Context, key string) {

@@ -78,9 +78,10 @@ func (m *PolicyManager) ReadPolicyObjectFromFileV2(jsonPath string, policyObject
 func (m *PolicyManager) CheckPerUePolicyV2(ueScope policyAPI.Scope, policyObject *mho.PolicyData) bool {
 	// Check policy scope according to O-RAN WG2.A1TD v1.00
 	// Value 0 identifies empty number field
-
+	log.Info("Scope: ", ueScope)
+	log.Info("UeIDL ", policyObject.API.Scope)
 	// Check if Policy is Per UE
-	if *policyObject.API.Scope.UeID == "" {
+	if policyObject.API.Scope.UeID == nil || *policyObject.API.Scope.UeID == "" {
 		return false
 	}
 	// Check if UE Id match
@@ -115,7 +116,7 @@ func (m *PolicyManager) CheckPerSlicePolicyV2(ueScope policyAPI.Scope, policyObj
 		return false
 	}
 
-	if *policyObject.API.Scope.SliceID.SD == "" ||
+	if *(policyObject.API.Scope.SliceID.SD) == "" ||
 		policyObject.API.Scope.SliceID.Sst == 0 ||
 		policyObject.API.Scope.SliceID.PlmnID.Mcc == "" ||
 		policyObject.API.Scope.SliceID.PlmnID.Mnc == "" ||
@@ -124,7 +125,7 @@ func (m *PolicyManager) CheckPerSlicePolicyV2(ueScope policyAPI.Scope, policyObj
 	}
 
 	// Check if UE Id exists
-	if *policyObject.API.Scope.UeID == "" {
+	if (policyObject.API.Scope.UeID != nil) && (*policyObject.API.Scope.UeID == "") {
 		return false
 	}
 
@@ -143,6 +144,7 @@ func (m *PolicyManager) CheckPerSlicePolicyV2(ueScope policyAPI.Scope, policyObj
 
 func (m *PolicyManager) GetTsResultForUEV2(ueScope policyAPI.Scope, rsrps []int, cellIds []policyAPI.CellID) policyAPI.CellID {
 
+	log.Info("CELL iD List in getTs:", cellIds)
 	var bestCell policyAPI.CellID
 	bestScore := -math.MaxFloat64
 	for i := 0; i < len(rsrps); i++ {
@@ -155,6 +157,7 @@ func (m *PolicyManager) GetTsResultForUEV2(ueScope policyAPI.Scope, rsrps []int,
 			bestScore = score
 		}
 	}
+	log.Info("The best one:", bestCell)
 	return bestCell
 }
 
@@ -168,19 +171,31 @@ func (m *PolicyManager) GetPreferenceV2(ueScope policyAPI.Scope, queryCellId pol
 	var preference string = "DEFAULT" // TODO: maybe change
 	for _, policy := range *m.policyMap {
 		if policy.IsEnforced {
+			log.Info("Policy Map:", *m.policyMap)
+			log.Infof("Policy in get pref [Pointer:%v, Value:%v, API:%v]", policy, *policy, *policy.API)
 			// Check if ueScope match the policy Scope
+			log.Info("Ue Scope:", *ueScope.UeID)
+			log.Info("Ue Policy:", *policy.API.Scope.UeID)
+			log.Info("Slice check:", m.CheckPerSlicePolicyV2(ueScope, policy))
+			log.Info("Ue check:", m.CheckPerUePolicyV2(ueScope, policy))
 			if m.CheckPerSlicePolicyV2(ueScope, policy) || m.CheckPerUePolicyV2(ueScope, policy) {
-
+				log.Info("Query CellID:", queryCellId)
 				// Find cell and related preference
 				for _, tspResource := range policy.API.TSPResources {
 
 					for _, cellId := range tspResource.CellIDList {
-						if cellId == queryCellId {
+						log.Info("CellId inside: ", cellId)
+						// log.Info("If result: ", cellId == queryCellId)
+						if *cellId.CID.NcI == *queryCellId.CID.NcI &&
+							cellId.PlmnID.Mcc == queryCellId.PlmnID.Mcc &&
+							cellId.PlmnID.Mnc == queryCellId.PlmnID.Mnc {
+							log.Info("Inside if!")
 							preference = string(tspResource.Preference)
 						}
 					}
 				}
 			}
+			log.Info("Preference:", preference)
 		}
 	}
 	return preference
@@ -194,7 +209,7 @@ func (m *PolicyManager) AddPolicyV2(policyId string, policyDir string, policyObj
 		log.Error(fmt.Sprintf("Couldn't read PolicyObject from file \n policyId: %s from: %s", policyId, policyPath))
 		return err
 	}
-	(*m.policyMap)[policyObject.Key] = policyObject
+	// (*m.policyMap)[policyObject.Key] = policyObject
 	return nil
 }
 
@@ -246,7 +261,7 @@ func (m *PolicyManager) UnmarshalTsPolicyJsonV2(jsonFile []byte, policyObject *m
 		return err
 	}
 	log.Debug("Successfully read the policy {tsPolicy}")
-	policyObject.IsEnforced = false // by default set policy to be not enforced
+	// policyObject.IsEnforced = false // by default set policy to be not enforced
 	return nil
 
 }
@@ -256,6 +271,12 @@ func (m *PolicyManager) LoadTsPolicyJsonFromFileV2(path string) ([]byte, error) 
 	jsonFile, err := os.Open(path)
 	if err != nil {
 		log.Error("Failed to open policy JSON File")
+		if os.IsNotExist(err) {
+			fmt.Print("File Does Not Exist: ")
+		} else if os.IsExist(err) {
+			fmt.Print("File Exists: ")
+		}
+		fmt.Println(err)
 		return nil, err
 	}
 

@@ -315,6 +315,10 @@ func (m *Manager) GetControlChannelsMap(ctx context.Context) map[string]chan *e2
 	return m.ctrlReqChs
 }
 
+func (m *Manager) GetPolicyManager() *tspolicy.PolicyManager {
+	return m.policyManager
+}
+
 func (m *Manager) SwitchUeBetweenCells(ctx context.Context, ueID string, targetCellCGI string) {
 
 	m.mutex.Lock()
@@ -327,6 +331,8 @@ func (m *Manager) SwitchUeBetweenCells(ctx context.Context, ueID string, targetC
 
 		targetCell := m.GetCell(ctx, targetCellCGI)
 		servingCell := m.GetCell(ctx, chosenUe.CGIString)
+
+		log.Info("Target:", targetCell)
 
 		targetCell.CumulativeHandoversOut++
 		servingCell.CumulativeHandoversIn++

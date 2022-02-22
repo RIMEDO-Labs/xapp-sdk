@@ -89,10 +89,12 @@ func (c *Client) GetCellTypes(ctx context.Context) (map[string]Cell, error) {
 	for _, cell := range cells {
 
 		cellObject := &topoapi.E2Cell{}
+		log.Info("Cell Object before:", cellObject)
 		err = cell.GetAspect(cellObject)
 		if err != nil {
 			log.Warn(err)
 		}
+		log.Info("Cell Object after:", cellObject)
 		output[string(cell.ID)] = Cell{
 			CGI:      cellObject.CellObjectID,
 			CellType: cellObject.CellType,

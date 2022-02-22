@@ -83,6 +83,7 @@ func (s *store) Put(ctx context.Context, key string, value interface{}) (*Entry,
 		Value: entry,
 		Type:  Created,
 	})
+	log.Infof("[Store Put] Key:%v, Value:%v", key, value)
 	return entry, nil
 
 }

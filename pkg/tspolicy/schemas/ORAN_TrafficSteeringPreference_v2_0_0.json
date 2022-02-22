@@ -1,0 +1,256 @@
+{
+    "policySchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "definitions": {
+            "CId": {
+                "oneOf": [
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "ncI": {
+                                "$ref": "#/definitions/NcI"
+                            }
+                        },
+                        "required": [
+                            "ncI"
+                        ],
+                        "type": "object"
+                    },
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "ecI": {
+                                "$ref": "#/definitions/EcI"
+                            }
+                        },
+                        "required": [
+                            "ecI"
+                        ],
+                        "type": "object"
+                    }
+                ]
+            },
+            "CellId": {
+                "additionalProperties": false,
+                "properties": {
+                    "cId": {
+                        "$ref": "#/definitions/CId"
+                    },
+                    "plmnId": {
+                        "$ref": "#/definitions/PlmnId"
+                    }
+                },
+                "required": [
+                    "plmnId",
+                    "cId"
+                ],
+                "type": "object"
+            },
+            "CellIdList": {
+                "items": {
+                    "$ref": "#/definitions/CellId"
+                },
+                "type": "array"
+            },
+            "EcI": {
+                "maximum": 268435455,
+                "minimum": 0,
+                "type": "integer"
+            },
+            "NcI": {
+                "maximum": 68719476735,
+                "minimum": 0,
+                "type": "integer"
+            },
+            "PlmnId": {
+                "additionalProperties": false,
+                "properties": {
+                    "mcc": {
+                        "pattern": "^[0-9]{3}$",
+                        "type": "string"
+                    },
+                    "mnc": {
+                        "pattern": "^[0-9]{2,3}$",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "mcc",
+                    "mnc"
+                ],
+                "type": "object"
+            },
+            "PreferenceType": {
+                "enum": [
+                    "SHALL",
+                    "PREFER",
+                    "AVOID",
+                    "FORBID"
+                ],
+                "type": "string"
+            },
+            "QosId": {
+                "oneOf": [
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "5qI": {
+                                "maximum": 256,
+                                "minimum": 1,
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "5qI"
+                        ],
+                        "type": "object"
+                    },
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "qcI": {
+                                "maximum": 256,
+                                "minimum": 1,
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "qcI"
+                        ],
+                        "type": "object"
+                    }
+                ]
+            },
+            "SliceId": {
+                "additionalProperties": false,
+                "properties": {
+                    "plmnId": {
+                        "$ref": "#/definitions/PlmnId"
+                    },
+                    "sd": {
+                        "pattern": "^[A-Fa-f0-9]{6}$",
+                        "type": "string"
+                    },
+                    "sst": {
+                        "maximum": 255,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "sst",
+                    "plmnId"
+                ],
+                "type": "object"
+            },
+            "TspResource": {
+                "additionalProperties": false,
+                "properties": {
+                    "cellIdList": {
+                        "$ref": "#/definitions/CellIdList"
+                    },
+                    "preference": {
+                        "$ref": "#/definitions/PreferenceType"
+                    },
+                    "primary": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "cellIdList",
+                    "preference"
+                ],
+                "type": "object"
+            },
+            "UeId": {
+                "pattern": "^[A-Fa-f0-9]{16}$",
+                "type": "string"
+            }
+        },
+        "description": "O-RAN standard Traffic Steering Preference policy",
+        "properties": {
+            "scope": {
+                "anyOf": [
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "cellId": {
+                                "$ref": "#/definitions/CellId"
+                            },
+                            "qosId": {
+                                "$ref": "#/definitions/QosId"
+                            },
+                            "sliceId": {
+                                "$ref": "#/definitions/SliceId"
+                            },
+                            "ueId": {
+                                "$ref": "#/definitions/UeId"
+                            }
+                        },
+                        "required": [
+                            "ueId"
+                        ],
+                        "type": "object"
+                    },
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "cellId": {
+                                "$ref": "#/definitions/CellId"
+                            },
+                            "qosId": {
+                                "$ref": "#/definitions/QosId"
+                            },
+                            "sliceId": {
+                                "$ref": "#/definitions/SliceId"
+                            }
+                        },
+                        "required": [
+                            "sliceId"
+                        ],
+                        "type": "object"
+                    }
+                ]
+            },
+            "tspResources": {
+                "items": {
+                    "$ref": "#/definitions/TspResource"
+                },
+                "minItems": 1,
+                "type": "array"
+            }
+        },
+        "required": [
+            "scope",
+            "tspResources"
+        ],
+        "type": "object"
+    },
+    "statusSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "additionalProperties": false,
+        "description": "O-RAN standard policy status",
+        "properties": {
+            "enforceReason": {
+                "enum": [
+                    "SCOPE_NOT_APPLICABLE",
+                    "STATEMENT_NOT_APPLICABLE",
+                    "OTHER_REASON"
+                ],
+                "type": "string"
+            },
+            "enforceStatus": {
+                "enum": [
+                    "ENFORCED",
+                    "NOT_ENFORCED"
+                ],
+                "type": "string"
+            }
+        },
+        "required": [
+            "enforceStatus"
+        ],
+        "type": "object"
+    }
+}

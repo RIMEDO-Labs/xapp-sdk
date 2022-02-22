@@ -32,10 +32,42 @@ func GetPlmnIDBytesFromCellGlobalID(cellGlobalID *e2sm_v2_ies.Cgi) []byte {
 
 func GetMccMncFromPlmnID(plmnId uint64) (string, string) {
 	plmnIdString := strconv.FormatUint(plmnId, 16)
-	mcc := ReverseString(plmnIdString[0:2]) + strings.ReplaceAll(ReverseString(plmnIdString[2:4]), "f", "")
-	mcn := ReverseString(plmnIdString[4:6])
+
+	middle := ReverseString(plmnIdString[2:4])
+	mcc := ReverseString(plmnIdString[0:2]) + middle[0:1]
+	mcn := ReverseString(plmnIdString[4:6]) + middle[1:2]
+	mcc = strings.ReplaceAll(mcc, "f", "")
+	mcc = strings.ReplaceAll(mcc, "F", "")
+	mcn = strings.ReplaceAll(mcn, "f", "")
+	mcn = strings.ReplaceAll(mcn, "F", "")
 
 	return mcc, mcn
+}
+
+func GetPlmnIdFromMccMnc(mcc string, mnc string) (uint64, error) {
+	combined := mcc + mnc
+	first := ReverseString(combined[0:2])
+	var middle string
+	var last string
+	if len(combined) > 5 {
+
+		middle = ReverseString(combined[2:4])
+		last = ReverseString(combined[4:6])
+
+	} else {
+
+		middle = "f" + combined[2:3]
+		last = ReverseString(combined[3:5])
+
+	}
+	plmnIdString := first + middle + last
+	plmnId, err := strconv.ParseUint(plmnIdString, 16, 64)
+	if err != nil {
+		log.Warn("Cannot convert PLMN ID string into uint64 type!")
+	} else {
+		log.Infof("PLMN ID string successfully converted into uint64 type (string:%v, uint64:%v).", plmnIdString, plmnId)
+	}
+	return plmnId, err
 }
 
 func ReverseString(str string) string {
